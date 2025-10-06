@@ -14,17 +14,33 @@ export default function Quickstart() {
 
   async function createTable() {
     setErr(null); setLoading(true);
-    await sb.auth.signInAnonymously();
-    const { data, error } = await sb.functions.invoke("create_table", {
-      body: { smallBlind: 10, bigBlind: 20, maxPlayers: 6, nickname: "Host" },
-    });
-    setLoading(false);
-    if (error) {
-      setErr(`status? ${ (error as any)?.status ?? "unknown" } | ${error.message}`);
-      console.error("create_table error:", error);
-      return;
+    
+    try {
+      // Sign in anonymously first
+      const { data: authData, error: authError } = await sb.auth.signInAnonymously();
+      if (authError) {
+        setErr(`Auth error: ${authError.message}`);
+        setLoading(false);
+        return;
+      }
+      
+      const { data, error } = await sb.functions.invoke("create_table", {
+        body: { smallBlind: 10, bigBlind: 20, maxPlayers: 6, nickname: "Host" },
+      });
+      
+      setLoading(false);
+      if (error) {
+        const errorData = error as any;
+        setErr(`Status: ${errorData?.status ?? "unknown"} | Message: ${error.message} | Details: ${JSON.stringify(errorData)}`);
+        console.error("create_table error:", error);
+        return;
+      }
+      setTableId(data?.tableId ?? null);
+    } catch (e) {
+      setLoading(false);
+      setErr(`Unexpected error: ${String(e)}`);
+      console.error("Unexpected error:", e);
     }
-    setTableId(data?.tableId ?? null);
   }
 
   return (

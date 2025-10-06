@@ -37,6 +37,15 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPA_URL, SERVICE_KEY);
 
+    // Extract and validate JWT token
+    const authHeader = req.headers.get('authorization') ?? '';
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!jwt) return new Response(JSON.stringify({ ok:false, error:'missing Authorization Bearer token' }), { status: 401, headers:{'content-type':'application/json'} });
+
+    const { data: userData, error: userErr } = await admin.auth.getUser(jwt);
+    if (userErr || !userData?.user?.id) return new Response(JSON.stringify({ ok:false, error:'invalid JWT (cannot resolve user)' }), { status: 401, headers:{'content-type':'application/json'} });
+    const uid = userData.user.id;
+
     const { tableId, nickname } = await req.json();
     if (!tableId || !nickname) {
       return new Response(JSON.stringify({ ok: false, error: "tableId and nickname required" }), { 
@@ -113,6 +122,7 @@ Deno.serve(async (req) => {
       .from("players")
       .insert({
         table_id: tableId,
+        uid: uid,
         seat: nextSeat,
         nickname: nickname,
         stack: 1000
