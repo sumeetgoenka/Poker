@@ -231,3 +231,6 @@ npm start
 ## License
 
 MIT
+
+## Supabase env
+Create `.env.local`:
