@@ -245,3 +245,15 @@ Deployment:
 ```bash
 npx supabase functions deploy --no-verify-jwt start_hand player_action
 ```
+
+## How to apply the database schema (no CLI)
+1. Open Supabase Dashboard → SQL Editor.
+2. Open the file `supabase/sql/poker_schema.sql` in this repo and copy all contents.
+3. Paste into the SQL Editor and run.
+4. Turn on Auth → Providers → Anonymous sign-ins.
+5. (Optional later) Database → Replication → enable Realtime for tables if your project has access. Not required for our Broadcast+Refetch approach.
+
+## Smoke test
+- Start dev server: `npm run dev`
+- Visit `/dev/quickstart` and click **Create Test Table**
+- Open the printed `/poker/<tableId>` in two tabs and try actions.
