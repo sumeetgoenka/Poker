@@ -234,3 +234,14 @@ MIT
 
 ## Supabase env
 Create `.env.local`:
+
+### Edge Functions
+- `start_hand`: Shuffles a deck, deals private holes, inserts a `hand` row with initial state, and sets `tables.status` to `in_hand`. Uses service-role key via Supabase secrets.
+- `player_action`: Records a player's action, updates `hand.pot`, advances `street` when appropriate, rotates `actor_seat`, and refreshes `act_deadline`.
+
+Both functions return `{ ok: true }` on success and should be invoked from the client via Supabase Functions. On success, the client broadcasts a `tick` over Realtime so all subscribers refetch.
+
+Deployment:
+```bash
+npx supabase functions deploy --no-verify-jwt start_hand player_action
+```

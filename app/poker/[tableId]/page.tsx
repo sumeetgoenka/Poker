@@ -46,7 +46,7 @@ export default function TablePage() {
         </ul>
       </section>
 
-      <ActionBar tableId={tableId} onAfterSuccess={tick} />
+      <ActionBar tableId={tableId} onAfterSuccess={tick} isHost={true} hasHand={!!state.hand} />
     </div>
   );
 }
