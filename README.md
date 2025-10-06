@@ -2,6 +2,8 @@
 
 A Next.js 14 poker frontend with Supabase backend, designed for embedding via iframe. Play chips only - no real money.
 
+_Created by Anay Goenka_
+
 ## Features
 
 - 🎮 Full poker game with Realtime updates via Supabase
