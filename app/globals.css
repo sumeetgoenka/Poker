@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --felt-bg: #0a5c3c;
+  --felt-dark: #084530;
+  --felt-light: #0c7048;
+}
+
+body {
+  @apply bg-felt text-white antialiased;
+}
+
+@layer utilities {
+  .felt-gradient {
+    background: radial-gradient(ellipse at center, var(--felt-light) 0%, var(--felt-bg) 50%, var(--felt-dark) 100%);
+  }
+}
