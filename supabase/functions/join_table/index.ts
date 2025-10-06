@@ -19,19 +19,23 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SERVICE_ROLE_KEY = Deno.env.get("SERVICE_ROLE_KEY");
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ ok: false, error: "Missing env" }), { 
-        status: 500, 
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*"
-        } 
-      });
+    const SUPA_URL =
+      Deno.env.get('SUPABASE_URL') ??
+      Deno.env.get('PROJECT_URL') ??
+      Deno.env.get('URL');
+
+    const SERVICE_KEY =
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+      Deno.env.get('SERVICE_ROLE_KEY');
+
+    if (!SUPA_URL || !SERVICE_KEY) {
+      return new Response(
+        JSON.stringify({ ok:false, error: 'Server misconfig: missing SUPABASE_URL or SERVICE_ROLE_KEY' }),
+        { status: 500, headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+      );
     }
 
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const admin = createClient(SUPA_URL, SERVICE_KEY);
 
     const { tableId, nickname } = await req.json();
     if (!tableId || !nickname) {
@@ -45,7 +49,7 @@ Deno.serve(async (req) => {
     }
 
     // Verify table exists and has space
-    const { data: tableRow, error: tableErr } = await supabase
+    const { data: tableRow, error: tableErr } = await admin
       .from("tables")
       .select("id, max_players, status")
       .eq("id", tableId)
@@ -72,7 +76,7 @@ Deno.serve(async (req) => {
     }
 
     // Count current players
-    const { data: players, error: playersErr } = await supabase
+    const { data: players, error: playersErr } = await admin
       .from("players")
       .select("seat")
       .eq("table_id", tableId);
@@ -105,7 +109,7 @@ Deno.serve(async (req) => {
     }
 
     // Add player
-    const { data: playerRow, error: playerErr } = await supabase
+    const { data: playerRow, error: playerErr } = await admin
       .from("players")
       .insert({
         table_id: tableId,

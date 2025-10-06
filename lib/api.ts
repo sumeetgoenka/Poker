@@ -24,11 +24,22 @@ export interface PlayerActionParams {
 }
 
 export async function createTable(params: CreateTableParams) {
+  // Supabase edge function expects camelCase fields; map and normalize response
   const { data, error } = await supabase.functions.invoke('create_table', {
-    body: params,
+    body: {
+      smallBlind: params.small_blind,
+      bigBlind: params.big_blind,
+      maxPlayers: params.max_players,
+      nickname: params.nickname,
+      defaultStack: params.default_stack,
+    },
   });
 
   if (error) throw error;
+  // Normalize to snake_case expected by callers
+  if (data && typeof data === 'object' && 'tableId' in data) {
+    return { ...data, table_id: (data as any).tableId };
+  }
   return data;
 }
 

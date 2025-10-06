@@ -128,6 +128,13 @@ supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 supabase secrets set SHUFFLE_SALT=your-random-salt-string
 ```
 
+Note: The Supabase Dashboard now blocks creating new secrets whose names start with `SUPABASE_`. To ensure compatibility, our Edge Functions read secrets under both old and new names. Specifically:
+
+- `SERVICE_ROLE_KEY` or `SUPABASE_SERVICE_ROLE_KEY` (preferred old name)
+- `SUPABASE_URL` or `PROJECT_URL` or `URL` for the project URL
+
+If either the service role key or project URL is missing at runtime, functions respond with a `500` and an error indicating the misconfiguration. This allows projects using older naming to continue working, while new projects can use `SERVICE_ROLE_KEY` and `SUPABASE_URL`-compatible variables.
+
 #### Auth Settings
 
 1. Enable Anonymous sign-in:
@@ -243,7 +250,8 @@ Both functions return `{ ok: true }` on success and should be invoked from the c
 
 Deployment:
 ```bash
-npx supabase functions deploy --no-verify-jwt start_hand player_action
+export SUPABASE_PROJECT_REF=muleucnxnojntqzqbvdt
+npx supabase functions deploy --no-verify-jwt create_table join_table start_hand player_action
 ```
 
 ## How to apply the database schema (no CLI)

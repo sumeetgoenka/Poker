@@ -19,21 +19,25 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SERVICE_ROLE_KEY = Deno.env.get("SERVICE_ROLE_KEY");
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ ok: false, error: "Missing env" }), { 
-        status: 500, 
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*"
-        } 
-      });
+    const SUPA_URL =
+      Deno.env.get('SUPABASE_URL') ??
+      Deno.env.get('PROJECT_URL') ??
+      Deno.env.get('URL');
+
+    const SERVICE_KEY =
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+      Deno.env.get('SERVICE_ROLE_KEY');
+
+    if (!SUPA_URL || !SERVICE_KEY) {
+      return new Response(
+        JSON.stringify({ ok:false, error: 'Server misconfig: missing SUPABASE_URL or SERVICE_ROLE_KEY' }),
+        { status: 500, headers: { 'content-type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+      );
     }
 
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const admin = createClient(SUPA_URL, SERVICE_KEY);
 
-    const { smallBlind, bigBlind, maxPlayers, nickname } = await req.json();
+    const { smallBlind, bigBlind, maxPlayers, nickname, defaultStack } = await req.json();
     if (!smallBlind || !bigBlind || !maxPlayers || !nickname) {
       return new Response(JSON.stringify({ ok: false, error: "Missing required fields" }), { 
         status: 400, 
@@ -44,17 +48,59 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create table
-    const { data: tableRow, error: tableErr } = await supabase
-      .from("tables")
-      .insert({
-        small_blind: smallBlind,
-        big_blind: bigBlind,
-        max_players: maxPlayers,
-        status: "waiting"
-      })
-      .select("id")
-      .maybeSingle();
+    // Extract uid from Authorization JWT if present (Anonymous or authenticated)
+    let hostUid: string | undefined = undefined;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const payloadB64 = token.split(".")[1];
+        const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"));
+        const payload = JSON.parse(json);
+        hostUid = payload.sub || payload.user_id || payload.uid;
+      } catch (_e) {
+        // ignore decode errors; hostUid stays undefined
+      }
+    }
+
+    // Create table (support both schemas)
+    let tableRow: { id: string } | null = null;
+    let tableErr: any = null;
+
+    // Attempt insert for schema with host_uid/default_stack
+    {
+      const { data, error } = await admin
+        .from("tables")
+        .insert({
+          small_blind: smallBlind,
+          big_blind: bigBlind,
+          max_players: maxPlayers,
+          status: "waiting",
+          host_uid: hostUid ?? "anonymous",
+          default_stack: defaultStack ?? 1000,
+          is_private: true,
+        })
+        .select("id")
+        .maybeSingle();
+      tableRow = data as any;
+      tableErr = error;
+    }
+
+    // Fallback to minimal schema (no host_uid/default_stack/is_private)
+    if (tableErr || !tableRow) {
+      const { data, error } = await admin
+        .from("tables")
+        .insert({
+          small_blind: smallBlind,
+          big_blind: bigBlind,
+          max_players: maxPlayers,
+          status: "waiting",
+        })
+        .select("id")
+        .maybeSingle();
+      tableRow = (tableRow ?? data) as any;
+      tableErr = error;
+    }
 
     if (tableErr || !tableRow) {
       return new Response(JSON.stringify({ ok: false, error: tableErr?.message ?? "table creation failed" }), { 
@@ -66,19 +112,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Add host as first player
-    const { data: playerRow, error: playerErr } = await supabase
-      .from("players")
-      .insert({
-        table_id: tableRow.id,
-        seat: 0,
-        nickname: nickname,
-        stack: 1000
-      })
-      .select("id")
-      .maybeSingle();
+    // Add host as first player (support either table_players or players schema)
+    let playerErr: any = null;
+    {
+      const { error } = await admin
+        .from("table_players")
+        .insert({
+          table_id: tableRow.id,
+          uid: hostUid ?? "anonymous",
+          seat: 1,
+          nickname: nickname,
+          stack: defaultStack ?? 1000,
+        });
+      playerErr = error;
+    }
 
-    if (playerErr || !playerRow) {
+    if (playerErr) {
+      const { error } = await admin
+        .from("players")
+        .insert({
+          table_id: tableRow.id,
+          seat: 0,
+          nickname: nickname,
+          stack: defaultStack ?? 1000,
+        });
+      playerErr = error;
+    }
+
+    if (playerErr) {
       return new Response(JSON.stringify({ ok: false, error: playerErr?.message ?? "player creation failed" }), { 
         status: 500, 
         headers: { 

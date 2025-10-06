@@ -31,23 +31,33 @@ function buildDeck(): string[] {
 
 Deno.serve(async (req) => {
   try {
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ ok: false, error: "Missing env" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    const SUPA_URL =
+      Deno.env.get('SUPABASE_URL') ??
+      Deno.env.get('PROJECT_URL') ??
+      Deno.env.get('URL');
+
+    const SERVICE_KEY =
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+      Deno.env.get('SERVICE_ROLE_KEY');
+
+    if (!SUPA_URL || !SERVICE_KEY) {
+      return new Response(
+        JSON.stringify({ ok:false, error: 'Server misconfig: missing SUPABASE_URL or SERVICE_ROLE_KEY' }),
+        { status: 500, headers: { 'content-type': 'application/json' } }
+      );
     }
 
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const admin = createClient(SUPA_URL, SERVICE_KEY);
 
     const { tableId } = await req.json();
     if (!tableId) return new Response(JSON.stringify({ ok: false, error: "tableId required" }), { status: 400, headers: { "Content-Type": "application/json" } });
 
     // Verify table exists
-    const { data: tableRow, error: tableErr } = await supabase.from("tables").select("id,status").eq("id", tableId).maybeSingle();
+    const { data: tableRow, error: tableErr } = await admin.from("tables").select("id,status").eq("id", tableId).maybeSingle();
     if (tableErr || !tableRow) return new Response(JSON.stringify({ ok: false, error: "table not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
 
     // Fetch players seated at this table
-    const { data: players, error: playersErr } = await supabase
+    const { data: players, error: playersErr } = await admin
       .from("players")
       .select("seat, id")
       .eq("table_id", tableId)
@@ -76,7 +86,7 @@ Deno.serve(async (req) => {
       street: "preflop",
       action_log: [] as Json,
     };
-    const { data: handRow, error: handErr } = await supabase.from("hand").insert(handInsert).select("id").maybeSingle();
+    const { data: handRow, error: handErr } = await admin.from("hand").insert(handInsert).select("id").maybeSingle();
     if (handErr || !handRow) return new Response(JSON.stringify({ ok: false, error: handErr?.message ?? "hand insert failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
 
     // Insert private holes rows
@@ -85,11 +95,11 @@ Deno.serve(async (req) => {
       seat: Number(seatStr),
       cards: cards as unknown as Json,
     }));
-    const { error: holesErr } = await supabase.from("private_holes").insert(holesRows);
+    const { error: holesErr } = await admin.from("private_holes").insert(holesRows);
     if (holesErr) return new Response(JSON.stringify({ ok: false, error: holesErr.message }), { status: 500, headers: { "Content-Type": "application/json" } });
 
     // Update table status
-    const { error: tableUpdErr } = await supabase.from("tables").update({ status: "in_hand" }).eq("id", tableId);
+    const { error: tableUpdErr } = await admin.from("tables").update({ status: "in_hand" }).eq("id", tableId);
     if (tableUpdErr) return new Response(JSON.stringify({ ok: false, error: tableUpdErr.message }), { status: 500, headers: { "Content-Type": "application/json" } });
 
     return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
