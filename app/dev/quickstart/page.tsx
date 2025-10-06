@@ -19,7 +19,11 @@ export default function Quickstart() {
       body: { smallBlind: 10, bigBlind: 20, maxPlayers: 6, nickname: "Host" },
     });
     setLoading(false);
-    if (error) { setErr(error.message); return; }
+    if (error) {
+      setErr(`status? ${ (error as any)?.status ?? "unknown" } | ${error.message}`);
+      console.error("create_table error:", error);
+      return;
+    }
     setTableId(data?.tableId ?? null);
   }
 
@@ -35,7 +39,7 @@ export default function Quickstart() {
         {loading ? "Creating..." : "Create Test Table"}
       </button>
 
-      {err && <p style={{ color: "tomato" }}>Error: {err}</p>}
+      {err && <pre style={{whiteSpace:"pre-wrap", color:"tomato"}}>{err}</pre>}
 
       {tableId && (
         <p>

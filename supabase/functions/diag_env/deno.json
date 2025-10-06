@@ -1,0 +1,7 @@
+{
+  "deploy": {
+    "exclude": ["**/node_modules"]
+  }
+}
+
+
