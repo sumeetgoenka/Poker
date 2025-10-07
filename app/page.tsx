@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { ToastContainer, ToastMessage } from '@/components/Toast';
-import { ensureAuth } from '@/lib/supabase-browser';
-import { createTable, joinTable } from '@/lib/api';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { createTable, joinTable } from '@/lib/firebase-api';
 
 export default function Home() {
   const router = useRouter();
@@ -25,9 +26,14 @@ export default function Home() {
   const [joinNickname, setJoinNickname] = useState('');
 
   useEffect(() => {
-    ensureAuth().catch((err) => {
-      addToast('Authentication failed', 'error');
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        signInAnonymously(auth).catch((err) => {
+          addToast('Authentication failed', 'error');
+        });
+      }
     });
+    return () => unsubscribe();
   }, []);
 
   const addToast = (message: string, type: ToastMessage['type']) => {
@@ -48,17 +54,23 @@ export default function Home() {
 
     setIsCreating(true);
     try {
-      const result = await createTable({
-        nickname: nickname.trim(),
-        small_blind: smallBlind,
-        big_blind: bigBlind,
-        default_stack: defaultStack,
-        max_players: maxPlayers,
-      });
+      const user = auth.currentUser;
+      if (!user) {
+        addToast('Please sign in first', 'error');
+        return;
+      }
 
-      if (result?.table_id) {
+      const result = await createTable({
+        smallBlind: smallBlind,
+        bigBlind: bigBlind,
+        defaultStack: defaultStack,
+        maxPlayers: maxPlayers,
+        nickname: nickname.trim(),
+      }, user.uid);
+
+      if (result?.tableId) {
         addToast('Table created successfully!', 'success');
-        router.push(`/table/${result.table_id}`);
+        router.push(`/table/${result.tableId}`);
       }
     } catch (err: any) {
       addToast(err.message || 'Failed to create table', 'error');
@@ -76,10 +88,16 @@ export default function Home() {
 
     setIsJoining(true);
     try {
+      const user = auth.currentUser;
+      if (!user) {
+        addToast('Please sign in first', 'error');
+        return;
+      }
+
       const result = await joinTable({
-        table_id: joinTableId.trim(),
+        tableId: joinTableId.trim(),
         nickname: joinNickname.trim(),
-      });
+      }, user.uid);
 
       if (result?.seat !== undefined) {
         addToast('Joined table successfully!', 'success');

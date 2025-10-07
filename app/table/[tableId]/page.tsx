@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { RealtimeChannel } from '@supabase/supabase-js';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { TimerRing } from '@/components/TimerRing';
 import { ToastContainer, ToastMessage } from '@/components/Toast';
 import { useGameStore } from '@/lib/store';
-import { supabase, ensureAuth } from '@/lib/supabase-browser';
-import { joinTable, startHand, playerAction, fetchGameState, fetchMyHoleCards } from '@/lib/api';
+import { auth } from '@/lib/firebase';
+import { joinTable, startHand, playerAction, fetchGameState, fetchMyHoleCards } from '@/lib/firebase-api';
 
 export default function TablePage() {
   const params = useParams();
@@ -30,7 +29,7 @@ export default function TablePage() {
   } = useGameStore();
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
+  const [channel, setChannel] = useState<any>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [nickname, setNickname] = useState('');
   const [hasJoined, setHasJoined] = useState(false);
@@ -49,8 +48,7 @@ export default function TablePage() {
 
   // Initialize auth and set invite links
   useEffect(() => {
-    ensureAuth().catch(() => addToast('Authentication failed', 'error'));
-
+    // Firebase auth is handled automatically
     if (typeof window !== 'undefined') {
       const base = window.location.origin;
       setInviteLink(`${base}/table/${tableId}`);
@@ -67,7 +65,7 @@ export default function TablePage() {
       if (initialPlayers) setPlayers(initialPlayers);
 
       // Check if we're already seated
-      const userId = (await supabase.auth.getUser()).data.user?.id;
+      const userId = auth.currentUser?.uid;
       const myPlayer = initialPlayers.find((p: any) => p.user_id === userId);
       if (myPlayer) {
         setMySeat(myPlayer.seat);
@@ -82,28 +80,19 @@ export default function TablePage() {
     }
   }, [tableId, setHand, setPlayers, setMySeat, setMyHoleCards]);
 
-  // Subscribe to Realtime channel
+  // Load initial state and set up polling
   useEffect(() => {
     loadInitialState();
 
-    const realtimeChannel = supabase.channel(`table:${tableId}`);
-
-    realtimeChannel.on('broadcast', { event: 'state_diff' }, ({ payload }) => {
-      applyStateDiff(payload);
-    });
-
-    realtimeChannel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log('Subscribed to table channel');
-      }
-    });
-
-    setChannel(realtimeChannel);
+    // Simple polling for now - we can enhance this later with Firebase realtime listeners
+    const interval = setInterval(() => {
+      loadInitialState();
+    }, 2000); // Poll every 2 seconds
 
     return () => {
-      realtimeChannel.unsubscribe();
+      clearInterval(interval);
     };
-  }, [tableId, loadInitialState, applyStateDiff]);
+  }, [tableId, loadInitialState]);
 
   const handleJoinTable = async () => {
     if (!nickname.trim()) {
@@ -196,7 +185,7 @@ export default function TablePage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => copyToClipboard(inviteLink, 'Invite link')} size="sm">
+            <Button onClick={() => copyToClipboard(tableId, 'Table ID')} size="sm">
               Copy Invite
             </Button>
             <Button onClick={() => copyToClipboard(embedLink, 'Embed link')} size="sm" variant="secondary">
