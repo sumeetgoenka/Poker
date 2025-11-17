@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, isFirebaseConfigured } from '@/lib/firebase';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -10,27 +10,40 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (user) => {
-        setUser(user);
-        setLoading(false);
+    // Skip if Firebase is not configured (during build or missing env vars)
+    if (!isFirebaseConfigured()) {
+      setError('Firebase is not configured. Please check your environment variables.');
+      setLoading(false);
+      return;
+    }
 
-        // Auto sign in anonymously if not authenticated
-        if (!user) {
-          signInAnonymously(auth).catch((err) => {
-            setError(err.message);
-            setLoading(false);
-          });
+    try {
+      const authInstance = auth;
+      const unsubscribe = onAuthStateChanged(
+        authInstance,
+        (user) => {
+          setUser(user);
+          setLoading(false);
+
+          // Auto sign in anonymously if not authenticated
+          if (!user) {
+            signInAnonymously(authInstance).catch((err) => {
+              setError(err.message);
+              setLoading(false);
+            });
+          }
+        },
+        (err) => {
+          setError(err.message);
+          setLoading(false);
         }
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
-      }
-    );
+      );
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (err) {
+      setError('Failed to initialize authentication');
+      setLoading(false);
+    }
   }, []);
 
   return { user, loading, error };

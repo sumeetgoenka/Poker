@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { fetchGameState, getTable, TableDocument } from '@/lib/firebase-api';
 import { GAME_CONSTANTS } from '@/lib/constants';
+import { isFirebaseConfigured } from '@/lib/firebase';
 
 interface UseGameStateOptions {
   tableId: string;
@@ -19,6 +20,13 @@ export function useGameState({ tableId, enablePolling = true, pollInterval = GAM
 
   const refetch = useCallback(async () => {
     if (!tableId) return;
+
+    // Skip if Firebase is not configured
+    if (!isFirebaseConfigured()) {
+      setError('Firebase is not configured');
+      setLoading(false);
+      return;
+    }
 
     try {
       setError(null);
