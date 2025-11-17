@@ -59,5 +59,18 @@ service cloud.firestore {
       // No deletion of hands
       allow delete: if false;
     }
+
+    // Hole cards collection (private)
+    match /hole_cards/{holeCardId} {
+      // Players can only read their own hole cards
+      allow read: if isAuthenticated() &&
+                     resource.data.user_id == request.auth.uid;
+
+      // Only system can create hole cards (in production, use Cloud Functions)
+      allow create: if isAuthenticated();
+
+      // No updates or deletions
+      allow update, delete: if false;
+    }
   }
 }

@@ -85,12 +85,12 @@ export default function TablePage() {
       // Check if we're already seated
       const userId = auth.currentUser?.uid;
       const myPlayer = initialPlayers.find((p: any) => p.user_id === userId);
-      if (myPlayer) {
+      if (myPlayer && userId) {
         setMySeat(myPlayer.seat);
         setHasJoined(true);
 
         // Load hole cards
-        const cards = await fetchMyHoleCards(tableId, myPlayer.seat);
+        const cards = await fetchMyHoleCards(tableId, userId);
         if (cards) setMyHoleCards(cards);
       }
     } catch (err: any) {

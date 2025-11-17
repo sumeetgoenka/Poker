@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { COLLECTIONS, ERROR_MESSAGES, GAME_CONSTANTS } from './constants';
 import { validateNickname, sanitizeNickname, validateTableParams } from './validation';
+import { createShuffledDeck, dealCards } from './deck';
 
 export interface CreateTableParams {
   smallBlind: number;
@@ -81,6 +82,15 @@ export interface HandDocument {
     amount: number;
     created_at: string;
   }>;
+  created_at: string;
+}
+
+export interface HoleCardsDocument {
+  hand_id: string;
+  table_id: string;
+  user_id: string;
+  seat: number;
+  cards: string[];
   created_at: string;
 }
 
@@ -259,13 +269,31 @@ export async function startHand(params: StartHandParams): Promise<{ hand_id: str
       throw new Error(ERROR_MESSAGES.INSUFFICIENT_PLAYERS);
     }
 
+    // Create and shuffle a new deck
+    let deck = createShuffledDeck();
+
+    // Deal 2 hole cards to each player
+    const playerHoleCards: Array<{ player: PlayerDocument & { id: string }; cards: string[] }> = [];
+    for (const player of players) {
+      const { cards, remainingDeck } = dealCards(deck, 2);
+      deck = remainingDeck;
+      playerHoleCards.push({
+        player,
+        cards: cards.map((c) => c.code),
+      });
+    }
+
+    // Deal 3 cards for the flop
+    const { cards: flopCards, remainingDeck: deckAfterFlop } = dealCards(deck, 3);
+    const board = flopCards.map((c) => c.code);
+
     // Create a new hand using batch write for atomicity
     const batch = writeBatch(db);
 
     const handData: HandDocument = {
       table_id,
       pot: 0,
-      board: [],
+      board,
       street: 'preflop',
       actor_seat: 1,
       act_deadline: new Date(
@@ -277,6 +305,20 @@ export async function startHand(params: StartHandParams): Promise<{ hand_id: str
 
     const handRef = doc(collection(db, COLLECTIONS.HANDS));
     batch.set(handRef, handData);
+
+    // Store hole cards for each player
+    for (const { player, cards } of playerHoleCards) {
+      const holeCardsData: HoleCardsDocument = {
+        hand_id: handRef.id,
+        table_id,
+        user_id: player.user_id,
+        seat: player.seat,
+        cards,
+        created_at: new Date().toISOString(),
+      };
+      const holeCardsRef = doc(collection(db, COLLECTIONS.HOLE_CARDS));
+      batch.set(holeCardsRef, holeCardsData);
+    }
 
     // Reset player bets and status
     for (const player of players) {
@@ -446,10 +488,46 @@ export async function fetchGameState(table_id: string): Promise<GameState> {
 /**
  * Fetch player's hole cards
  */
-export async function fetchMyHoleCards(table_id: string, seat: number): Promise<string[] | null> {
-  // For now, return null - in a real implementation, this would fetch private hole cards
-  // This would require server-side functions to ensure security
-  return null;
+export async function fetchMyHoleCards(table_id: string, user_id: string): Promise<string[] | null> {
+  if (!table_id || !user_id) {
+    return null;
+  }
+
+  try {
+    // Get the current hand for this table
+    const handsQuery = query(
+      collection(db, COLLECTIONS.HANDS),
+      where('table_id', '==', table_id),
+      orderBy('created_at', 'desc'),
+      limit(1)
+    );
+    const handsSnap = await getDocs(handsQuery);
+
+    if (handsSnap.empty) {
+      return null;
+    }
+
+    const handId = handsSnap.docs[0].id;
+
+    // Get the player's hole cards for this hand
+    const holeCardsQuery = query(
+      collection(db, COLLECTIONS.HOLE_CARDS),
+      where('hand_id', '==', handId),
+      where('user_id', '==', user_id),
+      limit(1)
+    );
+    const holeCardsSnap = await getDocs(holeCardsQuery);
+
+    if (holeCardsSnap.empty) {
+      return null;
+    }
+
+    const holeCardsData = holeCardsSnap.docs[0].data() as HoleCardsDocument;
+    return holeCardsData.cards;
+  } catch (error) {
+    console.error('Error fetching hole cards:', error);
+    return null;
+  }
 }
 
 /**

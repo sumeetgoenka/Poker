@@ -51,4 +51,5 @@ export const COLLECTIONS = {
   TABLES: 'tables',
   PLAYERS: 'players',
   HANDS: 'hands',
+  HOLE_CARDS: 'hole_cards',
 } as const;
