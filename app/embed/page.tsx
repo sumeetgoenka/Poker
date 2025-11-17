@@ -7,7 +7,7 @@ import { Card } from '@/components/Card';
 import { TimerRing } from '@/components/TimerRing';
 import { ToastContainer, ToastMessage } from '@/components/Toast';
 import { useGameStore } from '@/lib/store';
-import { auth } from '@/lib/firebase';
+import { auth, isFirebaseConfigured } from '@/lib/firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { joinTable, startHand, playerAction, fetchGameState, fetchMyHoleCards } from '@/lib/firebase-api';
 
@@ -50,6 +50,10 @@ function EmbedContent() {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        if (!isFirebaseConfigured() || !auth) {
+          console.warn('Firebase is not configured');
+          return;
+        }
         if (!auth.currentUser) {
           await signInAnonymously(auth);
         }
@@ -69,14 +73,16 @@ function EmbedContent() {
       if (initialHand) setHand(initialHand);
       if (initialPlayers) setPlayers(initialPlayers);
 
-      const userId = auth.currentUser?.uid;
-      const myPlayer = initialPlayers.find((p: any) => p.user_id === userId);
-      if (myPlayer) {
-        setMySeat(myPlayer.seat);
-        setHasJoined(true);
+      if (isFirebaseConfigured() && auth) {
+        const userId = auth.currentUser?.uid;
+        const myPlayer = initialPlayers.find((p: any) => p.user_id === userId);
+        if (myPlayer) {
+          setMySeat(myPlayer.seat);
+          setHasJoined(true);
 
-        const cards = await fetchMyHoleCards(tableId, myPlayer.seat);
-        if (cards) setMyHoleCards(cards);
+          const cards = await fetchMyHoleCards(tableId, myPlayer.seat);
+          if (cards) setMyHoleCards(cards);
+        }
       }
     } catch (err: any) {
       addToast(err.message || 'Failed to load game state', 'error');
@@ -102,6 +108,11 @@ function EmbedContent() {
   const handleJoinTable = async () => {
     if (!nickname.trim() || !tableId) {
       addToast('Please enter a nickname', 'error');
+      return;
+    }
+
+    if (!isFirebaseConfigured() || !auth) {
+      addToast('Firebase is not configured. Please check your environment variables.', 'error');
       return;
     }
 

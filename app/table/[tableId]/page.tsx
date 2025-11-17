@@ -8,7 +8,7 @@ import { TimerRing } from '@/components/TimerRing';
 import { ToastContainer, ToastMessage } from '@/components/Toast';
 import { PokerTable } from '@/components/PokerTable';
 import { useGameStore } from '@/lib/store';
-import { auth } from '@/lib/firebase';
+import { auth, isFirebaseConfigured } from '@/lib/firebase';
 import { joinTable, startHand, playerAction, fetchGameState, fetchMyHoleCards } from '@/lib/firebase-api';
 
 export default function TablePage() {
@@ -67,15 +67,17 @@ export default function TablePage() {
       if (initialPlayers) setPlayers(initialPlayers);
 
       // Check if we're already seated
-      const userId = auth.currentUser?.uid;
-      const myPlayer = initialPlayers.find((p: any) => p.user_id === userId);
-      if (myPlayer) {
-        setMySeat(myPlayer.seat);
-        setHasJoined(true);
+      if (isFirebaseConfigured() && auth) {
+        const userId = auth.currentUser?.uid;
+        const myPlayer = initialPlayers.find((p: any) => p.user_id === userId);
+        if (myPlayer) {
+          setMySeat(myPlayer.seat);
+          setHasJoined(true);
 
-        // Load hole cards
-        const cards = await fetchMyHoleCards(tableId, myPlayer.seat);
-        if (cards) setMyHoleCards(cards);
+          // Load hole cards
+          const cards = await fetchMyHoleCards(tableId, myPlayer.seat);
+          if (cards) setMyHoleCards(cards);
+        }
       }
     } catch (err: any) {
       addToast(err.message || 'Failed to load game state', 'error');
@@ -99,6 +101,11 @@ export default function TablePage() {
   const handleJoinTable = async () => {
     if (!nickname.trim()) {
       addToast('Please enter a nickname', 'error');
+      return;
+    }
+
+    if (!isFirebaseConfigured() || !auth) {
+      addToast('Firebase is not configured. Please check your environment variables.', 'error');
       return;
     }
 

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { ToastContainer, ToastMessage } from '@/components/Toast';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, isFirebaseConfigured } from '@/lib/firebase';
 import { createTable, joinTable } from '@/lib/firebase-api';
 
 export default function Home() {
@@ -26,6 +26,18 @@ export default function Home() {
   const [joinNickname, setJoinNickname] = useState('');
 
   useEffect(() => {
+    // Skip if Firebase is not configured
+    if (!isFirebaseConfigured()) {
+      console.warn('Firebase is not configured. Please check your environment variables.');
+      return;
+    }
+
+    // Ensure auth is defined before using it
+    if (!auth) {
+      console.error('Firebase auth is not initialized');
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         signInAnonymously(auth).catch((err) => {
@@ -49,6 +61,11 @@ export default function Home() {
     e.preventDefault();
     if (!nickname.trim()) {
       addToast('Please enter a nickname', 'error');
+      return;
+    }
+
+    if (!isFirebaseConfigured() || !auth) {
+      addToast('Firebase is not configured. Please check your environment variables.', 'error');
       return;
     }
 
@@ -83,6 +100,11 @@ export default function Home() {
     e.preventDefault();
     if (!joinNickname.trim() || !joinTableId.trim()) {
       addToast('Please enter both table ID and nickname', 'error');
+      return;
+    }
+
+    if (!isFirebaseConfigured() || !auth) {
+      addToast('Firebase is not configured. Please check your environment variables.', 'error');
       return;
     }
 
