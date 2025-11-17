@@ -11,7 +11,9 @@ export interface Player {
 export interface HandState {
   id: string;
   table_id: string;
-  dealer_seat: number;
+  dealer_seat?: number;
+  small_blind_seat?: number;
+  big_blind_seat?: number;
   actor_seat: number | null;
   act_deadline: string | null;
   board: string[];

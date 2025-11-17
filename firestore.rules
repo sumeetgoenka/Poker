@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isTableOwner(tableId) {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/tables/$(tableId)).data.created_by == request.auth.uid;
+    }
+
+    function isPlayerAtTable(tableId) {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/players/$(request.auth.uid + '_' + tableId));
+    }
+
+    // Tables collection
+    match /tables/{tableId} {
+      // Anyone authenticated can read table info
+      allow read: if isAuthenticated();
+
+      // Only authenticated users can create tables
+      allow create: if isAuthenticated() &&
+                      request.resource.data.created_by == request.auth.uid;
+
+      // Only table owner can update/delete
+      allow update, delete: if isTableOwner(tableId);
+    }
+
+    // Players collection
+    match /players/{playerId} {
+      // Anyone can read players
+      allow read: if isAuthenticated();
+
+      // Only authenticated users can join as a player
+      allow create: if isAuthenticated() &&
+                      request.resource.data.user_id == request.auth.uid;
+
+      // Only the player themselves can update their own data
+      allow update: if isAuthenticated() &&
+                      resource.data.user_id == request.auth.uid;
+
+      // Players can leave (delete themselves)
+      allow delete: if isAuthenticated() &&
+                      resource.data.user_id == request.auth.uid;
+    }
+
+    // Hands collection
+    match /hands/{handId} {
+      // Anyone can read hands
+      allow read: if isAuthenticated();
+
+      // Only players at the table can create/update hands
+      // In production, this should be handled by Cloud Functions
+      allow create, update: if isAuthenticated();
+
+      // No deletion of hands
+      allow delete: if false;
+    }
+  }
+}

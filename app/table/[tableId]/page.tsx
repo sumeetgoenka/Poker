@@ -104,7 +104,12 @@ export default function TablePage() {
 
     setIsJoining(true);
     try {
-      const result = await joinTable({ table_id: tableId, nickname: nickname.trim() });
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
+        addToast('Authentication required', 'error');
+        return;
+      }
+      const result = await joinTable({ tableId: tableId, nickname: nickname.trim() }, userId);
       setMySeat(result.seat);
       setHasJoined(true);
       addToast('Joined table successfully!', 'success');
@@ -193,17 +198,19 @@ export default function TablePage() {
     nickname: player.nickname,
     stack: player.stack,
     is_connected: true, // Assuming connected if they're in the game
-    cards: player.seat === mySeat ? myHoleCards : undefined,
+    cards: player.seat === mySeat ? (myHoleCards || undefined) : undefined,
     is_dealer: player.seat === hand?.dealer_seat,
     is_small_blind: player.seat === hand?.small_blind_seat,
     is_big_blind: player.seat === hand?.big_blind_seat,
     current_bet: player.bet,
     is_all_in: player.is_allin,
     is_folded: player.folded,
+    bet: player.bet,
+    acted: false,
   }));
 
   // Determine game state
-  const gameState = hand ? 'playing' : 'waiting';
+  const gameState: 'waiting' | 'playing' = hand ? 'playing' : 'waiting';
 
   return (
     <div className="relative">
@@ -213,7 +220,7 @@ export default function TablePage() {
         players={pokerTablePlayers}
         pot={hand?.pot ?? 0}
         board={hand?.board ?? []}
-        currentPlayer={hand?.actor_seat}
+        currentPlayer={hand?.actor_seat ?? undefined}
         gameState={gameState}
         onSeatClick={handleSeatClick}
         onShareLink={handleShareLink}
