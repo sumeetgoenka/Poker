@@ -6,6 +6,8 @@
   --felt-bg: #0a5c3c;
   --felt-dark: #084530;
   --felt-light: #0c7048;
+  --gold: #ffd700;
+  --gold-dark: #daa520;
 }
 
 body {
@@ -13,51 +15,279 @@ body {
 }
 
 @layer utilities {
+  /* Poker table gradients */
   .felt-gradient {
     background: radial-gradient(ellipse at center, var(--felt-light) 0%, var(--felt-bg) 50%, var(--felt-dark) 100%);
   }
-  
+
   .poker-table {
     background: radial-gradient(ellipse at center, #0c7048 0%, #0a5c3c 50%, #084530 100%);
   }
-  
-  .seat-hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
-  }
-  
-  .player-card {
-    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
-    border: 2px solid #4b5563;
-  }
-  
-  .player-card.occupied {
-    background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
-    border-color: #6b7280;
-  }
-  
+
   .poker-table-surface {
     background: radial-gradient(ellipse at center, #0c7048 0%, #0a5c3c 50%, #084530 100%);
-    box-shadow: 
-      inset 0 0 50px rgba(0, 0, 0, 0.3),
-      0 0 30px rgba(0, 0, 0, 0.5);
+    box-shadow:
+      inset 0 0 60px rgba(0, 0, 0, 0.4),
+      inset 0 0 120px rgba(0, 0, 0, 0.2),
+      0 0 40px rgba(0, 0, 0, 0.6);
   }
-  
+
+  /* Glassmorphism */
+  .glass {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .glass-dark {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Player seat styles */
+  .seat-hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(59, 130, 246, 0.6);
+  }
+
+  .player-card {
+    background: linear-gradient(135deg, rgba(31, 41, 55, 0.9) 0%, rgba(55, 65, 81, 0.9) 100%);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(75, 85, 99, 0.5);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .player-card.occupied {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.95) 0%, rgba(75, 85, 99, 0.95) 100%);
+    border-color: rgba(107, 114, 128, 0.8);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  .player-card.current-turn {
+    border-color: #10b981;
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+    animation: pulse-border 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
   .seat-number {
     font-weight: bold;
     color: #9ca3af;
-    text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
   }
-  
+
   .player-name {
     font-weight: bold;
     color: white;
-    text-shadow: 0 0 3px rgba(0, 0, 0, 0.7);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
   }
-  
+
   .stack-amount {
     color: #fbbf24;
     font-weight: bold;
-    text-shadow: 0 0 3px rgba(0, 0, 0, 0.7);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
   }
+
+  /* Chip animations */
+  .chip-stack {
+    position: relative;
+    animation: float 3s ease-in-out infinite;
+  }
+
+  /* Card effects */
+  .card-3d {
+    transform-style: preserve-3d;
+    transition: transform 0.3s ease;
+  }
+
+  .card-3d:hover {
+    transform: translateY(-5px) rotateY(5deg);
+  }
+
+  /* Button effects */
+  .btn-shine {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-shine::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
+  }
+
+  .btn-shine:hover::before {
+    left: 100%;
+  }
+
+  /* Pot display */
+  .pot-display {
+    background: linear-gradient(135deg, #b45309 0%, #d97706 50%, #f59e0b 100%);
+    box-shadow:
+      0 4px 15px rgba(245, 158, 11, 0.4),
+      inset 0 2px 4px rgba(255, 255, 255, 0.3),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* Action buttons */
+  .action-btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .action-btn:active {
+    transform: scale(0.95);
+  }
+
+  /* Toast animations */
+  .toast-enter {
+    animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .toast-exit {
+    animation: slideOutRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Loading spinner */
+  .spinner {
+    animation: spin 1s linear infinite;
+  }
+
+  .spinner-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+/* Keyframe animations */
+@keyframes pulse-border {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.8);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow:
+      0 4px 15px rgba(245, 158, 11, 0.4),
+      inset 0 2px 4px rgba(255, 255, 255, 0.3),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 6px 25px rgba(245, 158, 11, 0.6),
+      inset 0 2px 4px rgba(255, 255, 255, 0.4),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Skeleton loading */
+.skeleton {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Smooth scrolling */
+@media (prefers-reduced-motion: no-preference) {
+  * {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background-color: rgba(16, 185, 129, 0.3);
+  color: white;
 }
