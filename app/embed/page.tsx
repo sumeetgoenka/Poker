@@ -2,14 +2,14 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { RealtimeChannel } from '@supabase/supabase-js';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { TimerRing } from '@/components/TimerRing';
 import { ToastContainer, ToastMessage } from '@/components/Toast';
 import { useGameStore } from '@/lib/store';
-import { supabase, ensureAuth } from '@/lib/supabase-browser';
-import { joinTable, startHand, playerAction, fetchGameState, fetchMyHoleCards } from '@/lib/api';
+import { auth } from '@/lib/firebase';
+import { signInAnonymously } from 'firebase/auth';
+import { joinTable, startHand, playerAction, fetchGameState, fetchMyHoleCards } from '@/lib/firebase-api';
 
 function EmbedContent() {
   const searchParams = useSearchParams();
@@ -30,7 +30,6 @@ function EmbedContent() {
   } = useGameStore();
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [nickname, setNickname] = useState('');
   const [hasJoined, setHasJoined] = useState(false);
@@ -47,8 +46,18 @@ function EmbedContent() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // Initialize Firebase auth
   useEffect(() => {
-    ensureAuth().catch(() => addToast('Authentication failed', 'error'));
+    const initAuth = async () => {
+      try {
+        if (!auth.currentUser) {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        addToast('Authentication failed', 'error');
+      }
+    };
+    initAuth();
   }, []);
 
   const loadInitialState = useCallback(async () => {
@@ -60,7 +69,7 @@ function EmbedContent() {
       if (initialHand) setHand(initialHand);
       if (initialPlayers) setPlayers(initialPlayers);
 
-      const userId = (await supabase.auth.getUser()).data.user?.id;
+      const userId = auth.currentUser?.uid;
       const myPlayer = initialPlayers.find((p: any) => p.user_id === userId);
       if (myPlayer) {
         setMySeat(myPlayer.seat);
@@ -74,29 +83,21 @@ function EmbedContent() {
     }
   }, [tableId, setHand, setPlayers, setMySeat, setMyHoleCards]);
 
+  // Load initial state and set up polling
   useEffect(() => {
     if (!tableId) return;
 
     loadInitialState();
 
-    const realtimeChannel = supabase.channel(`table:${tableId}`);
-
-    realtimeChannel.on('broadcast', { event: 'state_diff' }, ({ payload }) => {
-      applyStateDiff(payload);
-    });
-
-    realtimeChannel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log('Subscribed to table channel');
-      }
-    });
-
-    setChannel(realtimeChannel);
+    // Poll for updates every 2 seconds
+    const interval = setInterval(() => {
+      loadInitialState();
+    }, 2000);
 
     return () => {
-      realtimeChannel.unsubscribe();
+      clearInterval(interval);
     };
-  }, [tableId, loadInitialState, applyStateDiff]);
+  }, [tableId, loadInitialState]);
 
   const handleJoinTable = async () => {
     if (!nickname.trim() || !tableId) {
@@ -106,7 +107,13 @@ function EmbedContent() {
 
     setIsJoining(true);
     try {
-      const result = await joinTable({ table_id: tableId, nickname: nickname.trim() });
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
+        addToast('Please wait for authentication', 'error');
+        return;
+      }
+
+      const result = await joinTable({ tableId: tableId, nickname: nickname.trim() }, userId);
       setMySeat(result.seat);
       setHasJoined(true);
       addToast('Joined table!', 'success');
