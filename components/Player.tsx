@@ -15,7 +15,7 @@ interface PlayerProps {
     is_all_in?: boolean;
     is_folded?: boolean;
     is_current_player?: boolean;
-  };
+  } | null;
   position: { x: number; y: number };
   isHovered: boolean;
   onClick: () => void;
@@ -91,7 +91,7 @@ export function Player({ player, position, isHovered, onClick }: PlayerProps) {
           )}
         </div>
       ) : (
-        <div className="seat-number text-lg">{player.seat}</div>
+        <div className="text-gray-400 text-sm">Empty Seat</div>
       )}
     </div>
   );
