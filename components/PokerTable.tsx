@@ -26,17 +26,21 @@ interface PokerTableProps {
   onSeatClick: (seat: number) => void;
   onShareLink: () => void;
   onJoinLiveGame: () => void;
+  ownerNickname: string;
+  blinds: string;
 }
 
-export function PokerTable({ 
-  players, 
-  pot, 
-  board, 
-  currentPlayer, 
+export function PokerTable({
+  players,
+  pot,
+  board,
+  currentPlayer,
   gameState,
   onSeatClick,
   onShareLink,
-  onJoinLiveGame 
+  onJoinLiveGame,
+  ownerNickname,
+  blinds
 }: PokerTableProps) {
   const [hoveredSeat, setHoveredSeat] = useState<number | null>(null);
 
@@ -69,8 +73,8 @@ export function PokerTable({
           </button>
         </div>
         <div className="flex items-center space-x-4 text-white">
-          <span>OWNER: HEHEEHEH</span>
-          <span>NLH ~ 10/20</span>
+          <span>OWNER: {ownerNickname.toUpperCase()}</span>
+          <span>NLH ~ {blinds}</span>
           <button className="p-2 hover:bg-gray-700 rounded">
             🔊
           </button>
@@ -176,20 +180,6 @@ export function PokerTable({
                 />
               );
             })}
-          </div>
-          
-          {/* Player Info Box (bottom right of table) */}
-          <div className="absolute bottom-4 right-4 bg-gray-800 border border-gray-600 rounded-lg p-3 min-w-32">
-            <div className="flex items-center space-x-2 mb-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-sm text-gray-300">WAITING</span>
-            </div>
-            <div className="text-white font-bold">heheeheh</div>
-            <div className="text-gray-400 text-sm">1782</div>
-            <div className="flex space-x-1 mt-1">
-              <span>😉</span>
-              <span>😘</span>
-            </div>
           </div>
         </div>
       </div>

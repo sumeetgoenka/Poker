@@ -9,7 +9,7 @@ import { ToastContainer, ToastMessage } from '@/components/Toast';
 import { PokerTable } from '@/components/PokerTable';
 import { useGameStore } from '@/lib/store';
 import { auth } from '@/lib/firebase';
-import { joinTable, startHand, playerAction, fetchGameState, fetchMyHoleCards } from '@/lib/firebase-api';
+import { joinTable, startHand, playerAction, fetchGameState, fetchMyHoleCards, getTable } from '@/lib/firebase-api';
 
 export default function TablePage() {
   const params = useParams();
@@ -61,7 +61,23 @@ export default function TablePage() {
   // Load initial state
   const loadInitialState = useCallback(async () => {
     try {
-      const { hand: initialHand, players: initialPlayers } = await fetchGameState(tableId);
+      // Fetch table info and game state
+      const [tableInfo, gameState] = await Promise.all([
+        getTable(tableId),
+        fetchGameState(tableId)
+      ]);
+
+      const { hand: initialHand, players: initialPlayers } = gameState;
+
+      // Store table info with owner nickname
+      if (tableInfo) {
+        const ownerPlayer = initialPlayers.find((p: any) => p.user_id === tableInfo.created_by);
+        setTable({
+          id: tableId,
+          ...tableInfo,
+          owner_nickname: ownerPlayer?.nickname || 'Unknown'
+        });
+      }
 
       if (initialHand) setHand(initialHand);
       if (initialPlayers) setPlayers(initialPlayers);
@@ -80,7 +96,7 @@ export default function TablePage() {
     } catch (err: any) {
       addToast(err.message || 'Failed to load game state', 'error');
     }
-  }, [tableId, setHand, setPlayers, setMySeat, setMyHoleCards]);
+  }, [tableId, setTable, setHand, setPlayers, setMySeat, setMyHoleCards]);
 
   // Load initial state and set up polling
   useEffect(() => {
@@ -225,6 +241,8 @@ export default function TablePage() {
         onSeatClick={handleSeatClick}
         onShareLink={handleShareLink}
         onJoinLiveGame={handleJoinLiveGame}
+        ownerNickname={table?.owner_nickname || 'Unknown'}
+        blinds={`${table?.small_blind || 0}/${table?.big_blind || 0}`}
       />
 
       {/* Action buttons overlay */}

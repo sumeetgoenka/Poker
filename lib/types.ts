@@ -32,6 +32,8 @@ export interface TableConfig {
   big_blind: number;
   max_players: number;
   default_stack: number;
+  created_by: string;
+  owner_nickname?: string;
 }
 
 export interface PrivateHole {
