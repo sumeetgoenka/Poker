@@ -95,6 +95,37 @@ export default function TablePage() {
     }
   }, [tableId, setHand, setPlayers, setMySeat, setMyHoleCards]);
 
+  // Handle joining the table
+  const handleJoinTable = useCallback(async (customNickname?: string) => {
+    const nicknameToUse = customNickname || nickname;
+
+    if (!nicknameToUse.trim()) {
+      addToast('Please enter a nickname', 'error');
+      return;
+    }
+
+    setIsJoining(true);
+    try {
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
+        addToast('Authentication required', 'error');
+        setIsJoining(false);
+        return;
+      }
+      const result = await joinTable({ tableId: tableId, nickname: nicknameToUse.trim() }, userId);
+      setMySeat(result.seat);
+      setHasJoined(true);
+      addToast('Joined table successfully!', 'success');
+
+      // Reload state
+      await loadInitialState();
+    } catch (err: any) {
+      addToast(err.message || 'Failed to join table', 'error');
+    } finally {
+      setIsJoining(false);
+    }
+  }, [nickname, tableId, loadInitialState]);
+
   // Load initial state and set up polling
   useEffect(() => {
     loadInitialState();
@@ -152,36 +183,6 @@ export default function TablePage() {
       autoJoinAttempted.current = true;
     }
   }, [authLoading, user, initialStateLoaded, players, hasJoined, isJoining, handleJoinTable]);
-
-  const handleJoinTable = useCallback(async (customNickname?: string) => {
-    const nicknameToUse = customNickname || nickname;
-
-    if (!nicknameToUse.trim()) {
-      addToast('Please enter a nickname', 'error');
-      return;
-    }
-
-    setIsJoining(true);
-    try {
-      const userId = auth.currentUser?.uid;
-      if (!userId) {
-        addToast('Authentication required', 'error');
-        setIsJoining(false);
-        return;
-      }
-      const result = await joinTable({ tableId: tableId, nickname: nicknameToUse.trim() }, userId);
-      setMySeat(result.seat);
-      setHasJoined(true);
-      addToast('Joined table successfully!', 'success');
-
-      // Reload state
-      await loadInitialState();
-    } catch (err: any) {
-      addToast(err.message || 'Failed to join table', 'error');
-    } finally {
-      setIsJoining(false);
-    }
-  }, [nickname, tableId, loadInitialState]);
 
   const handleStartHand = async () => {
     try {
