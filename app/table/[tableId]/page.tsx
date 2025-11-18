@@ -41,7 +41,6 @@ export default function TablePage() {
   const [embedLink, setEmbedLink] = useState('');
   const [showDebug, setShowDebug] = useState(false);
   const [initialStateLoaded, setInitialStateLoaded] = useState(false);
-  const autoJoinAttempted = useRef(false);
 
   const addToast = (message: string, type: ToastMessage['type']) => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -50,12 +49,6 @@ export default function TablePage() {
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  // Generate a random guest nickname
-  const generateGuestNickname = () => {
-    const randomNum = Math.floor(Math.random() * 10000);
-    return `Guest_${randomNum}`;
   };
 
   // Initialize auth and set invite links
@@ -109,10 +102,8 @@ export default function TablePage() {
   }, [tableId, setTable, setHand, setPlayers, setMySeat, setMyHoleCards]);
 
   // Handle joining the table
-  const handleJoinTable = useCallback(async (customNickname?: string) => {
-    const nicknameToUse = customNickname || nickname;
-
-    if (!nicknameToUse.trim()) {
+  const handleJoinTable = useCallback(async () => {
+    if (!nickname.trim()) {
       addToast('Please enter a nickname', 'error');
       return;
     }
@@ -125,7 +116,7 @@ export default function TablePage() {
         setIsJoining(false);
         return;
       }
-      const result = await joinTable({ tableId: tableId, nickname: nicknameToUse.trim() }, userId);
+      const result = await joinTable({ tableId: tableId, nickname: nickname.trim() }, userId);
       setMySeat(result.seat);
       setHasJoined(true);
       addToast('Joined table successfully!', 'success');
@@ -152,50 +143,6 @@ export default function TablePage() {
       clearInterval(interval);
     };
   }, [tableId, loadInitialState]);
-
-  // Auto-join new users with a guest nickname
-  useEffect(() => {
-    // Only attempt auto-join once
-    if (autoJoinAttempted.current) return;
-
-    // Wait for auth to complete
-    if (authLoading || !user) {
-      console.log('[Auto-join] Waiting for auth...', { authLoading, hasUser: !!user });
-      return;
-    }
-
-    // Wait for initial state to load
-    if (!initialStateLoaded) {
-      console.log('[Auto-join] Waiting for initial state...');
-      return;
-    }
-
-    // Check if user is already seated
-    const userId = user.uid;
-    const myPlayer = players.find((p: any) => p.user_id === userId);
-
-    console.log('[Auto-join] Checking user status:', {
-      userId,
-      myPlayer: !!myPlayer,
-      hasJoined,
-      isJoining,
-      playersCount: players.length
-    });
-
-    if (!myPlayer && !hasJoined && !isJoining) {
-      // User is not seated and hasn't joined yet - auto-join them
-      console.log('[Auto-join] Attempting auto-join...');
-      autoJoinAttempted.current = true;
-      const guestNickname = generateGuestNickname();
-      console.log('[Auto-join] Generated nickname:', guestNickname);
-      handleJoinTable(guestNickname);
-    } else if (myPlayer) {
-      // User is already seated, mark as joined
-      console.log('[Auto-join] User already seated at seat', myPlayer.seat);
-      setHasJoined(true);
-      autoJoinAttempted.current = true;
-    }
-  }, [authLoading, user, initialStateLoaded, players, hasJoined, isJoining, handleJoinTable]);
 
   const handleStartHand = async () => {
     try {
@@ -230,27 +177,27 @@ export default function TablePage() {
   const currentBet = Math.max(...players.map((p) => p.bet), 0);
   const callAmount = myPlayer ? currentBet - myPlayer.bet : 0;
 
-  // Show loading state while auth or initial state is loading, or while auto-joining
-  if (!hasJoined) {
-    // If we're still loading auth or initial state, show a loading screen
-    if (authLoading || !initialStateLoaded || (autoJoinAttempted.current && isJoining)) {
-      return (
-        <div className="min-h-screen felt-gradient flex items-center justify-center p-4">
-          <ToastContainer toasts={toasts} onDismiss={removeToast} />
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md w-full text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-white text-lg">Joining table...</p>
-          </div>
+  // Show loading state while auth or initial state is loading
+  if (authLoading || !initialStateLoaded) {
+    return (
+      <div className="min-h-screen felt-gradient flex items-center justify-center p-4">
+        <ToastContainer toasts={toasts} onDismiss={removeToast} />
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md w-full text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-white text-lg">Loading table...</p>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-    // Show the join form only if auto-join didn't happen or failed
+  // Show join form if user is not seated
+  if (!hasJoined) {
     return (
       <div className="min-h-screen felt-gradient flex items-center justify-center p-4">
         <ToastContainer toasts={toasts} onDismiss={removeToast} />
         <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md w-full">
           <h2 className="text-2xl font-bold mb-4">Join Table</h2>
+          <p className="text-white/70 mb-4">Enter your nickname to join this poker table</p>
           <input
             type="text"
             value={nickname}
@@ -260,7 +207,7 @@ export default function TablePage() {
             maxLength={20}
             onKeyDown={(e) => e.key === 'Enter' && handleJoinTable()}
           />
-          <Button onClick={() => handleJoinTable()} disabled={isJoining} className="w-full" size="lg">
+          <Button onClick={handleJoinTable} disabled={isJoining} className="w-full" size="lg">
             {isJoining ? 'Joining...' : 'Join Table'}
           </Button>
         </div>
