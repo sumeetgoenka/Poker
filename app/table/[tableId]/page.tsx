@@ -73,7 +73,15 @@ export default function TablePage() {
     try {
       // Fetch table data
       const tableData = await getTable(tableId);
-      if (tableData) setTable(tableData);
+      if (tableData) {
+        setTable({
+          id: tableId,
+          small_blind: tableData.small_blind,
+          big_blind: tableData.big_blind,
+          max_players: tableData.max_players,
+          default_stack: tableData.default_stack,
+        });
+      }
 
       // Fetch game state
       const { hand: initialHand, players: initialPlayers } = await fetchGameState(tableId);
