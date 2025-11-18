@@ -115,28 +115,45 @@ export default function TablePage() {
     if (autoJoinAttempted.current) return;
 
     // Wait for auth to complete
-    if (authLoading || !user) return;
+    if (authLoading || !user) {
+      console.log('[Auto-join] Waiting for auth...', { authLoading, hasUser: !!user });
+      return;
+    }
 
     // Wait for initial state to load
-    if (!initialStateLoaded) return;
+    if (!initialStateLoaded) {
+      console.log('[Auto-join] Waiting for initial state...');
+      return;
+    }
 
     // Check if user is already seated
     const userId = user.uid;
     const myPlayer = players.find((p: any) => p.user_id === userId);
 
+    console.log('[Auto-join] Checking user status:', {
+      userId,
+      myPlayer: !!myPlayer,
+      hasJoined,
+      isJoining,
+      playersCount: players.length
+    });
+
     if (!myPlayer && !hasJoined && !isJoining) {
       // User is not seated and hasn't joined yet - auto-join them
+      console.log('[Auto-join] Attempting auto-join...');
       autoJoinAttempted.current = true;
       const guestNickname = generateGuestNickname();
+      console.log('[Auto-join] Generated nickname:', guestNickname);
       handleJoinTable(guestNickname);
     } else if (myPlayer) {
       // User is already seated, mark as joined
+      console.log('[Auto-join] User already seated at seat', myPlayer.seat);
       setHasJoined(true);
       autoJoinAttempted.current = true;
     }
-  }, [authLoading, user, initialStateLoaded, players, hasJoined, isJoining]);
+  }, [authLoading, user, initialStateLoaded, players, hasJoined, isJoining, handleJoinTable]);
 
-  const handleJoinTable = async (customNickname?: string) => {
+  const handleJoinTable = useCallback(async (customNickname?: string) => {
     const nicknameToUse = customNickname || nickname;
 
     if (!nicknameToUse.trim()) {
@@ -149,6 +166,7 @@ export default function TablePage() {
       const userId = auth.currentUser?.uid;
       if (!userId) {
         addToast('Authentication required', 'error');
+        setIsJoining(false);
         return;
       }
       const result = await joinTable({ tableId: tableId, nickname: nicknameToUse.trim() }, userId);
@@ -163,7 +181,7 @@ export default function TablePage() {
     } finally {
       setIsJoining(false);
     }
-  };
+  }, [nickname, tableId, loadInitialState]);
 
   const handleStartHand = async () => {
     try {
@@ -336,7 +354,17 @@ export default function TablePage() {
       {showDebug && (
         <div className="fixed top-16 right-4 bg-gray-900 text-white p-4 rounded-lg max-w-md max-h-96 overflow-y-auto z-40">
           <h3 className="font-bold mb-2">Debug Info</h3>
-          
+
+          <div className="mb-4">
+            <h4 className="font-semibold">User Info</h4>
+            <div className="text-sm">
+              <div>User ID: {user?.uid || 'Not authenticated'}</div>
+              <div>My Seat: {mySeat !== null ? mySeat : 'Not seated'}</div>
+              <div>Has Joined: {hasJoined ? 'Yes' : 'No'}</div>
+              <div>Auth Loading: {authLoading ? 'Yes' : 'No'}</div>
+            </div>
+          </div>
+
           <div className="mb-4">
             <h4 className="font-semibold">Table Info</h4>
             <div className="text-sm">
