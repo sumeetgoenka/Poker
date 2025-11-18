@@ -10,7 +10,7 @@ import { PokerTable } from '@/components/PokerTable';
 import { useGameStore } from '@/lib/store';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
-import { joinTable, startHand, playerAction, fetchGameState, fetchMyHoleCards } from '@/lib/firebase-api';
+import { joinTable, startHand, playerAction, fetchGameState, fetchMyHoleCards, getTable } from '@/lib/firebase-api';
 
 export default function TablePage() {
   const params = useParams();
@@ -71,6 +71,11 @@ export default function TablePage() {
   // Load initial state
   const loadInitialState = useCallback(async () => {
     try {
+      // Fetch table data
+      const tableData = await getTable(tableId);
+      if (tableData) setTable(tableData);
+
+      // Fetch game state
       const { hand: initialHand, players: initialPlayers } = await fetchGameState(tableId);
 
       if (initialHand) setHand(initialHand);
@@ -93,7 +98,7 @@ export default function TablePage() {
     } catch (err: any) {
       addToast(err.message || 'Failed to load game state', 'error');
     }
-  }, [tableId, setHand, setPlayers, setMySeat, setMyHoleCards]);
+  }, [tableId, setTable, setHand, setPlayers, setMySeat, setMyHoleCards]);
 
   // Handle joining the table
   const handleJoinTable = useCallback(async (customNickname?: string) => {
@@ -302,6 +307,9 @@ export default function TablePage() {
         onSeatClick={handleSeatClick}
         onShareLink={handleShareLink}
         onJoinLiveGame={handleJoinLiveGame}
+        myNickname={myPlayer?.nickname}
+        myStack={myPlayer?.stack}
+        blinds={table ? { small: table.small_blind, big: table.big_blind } : undefined}
       />
 
       {/* Action buttons overlay */}
