@@ -34,3 +34,4 @@ Updates:
 - Removed all Supabase routes/pages; no app/ code imports Supabase anymore.
 - Updated SETUP.md to Firebase-only config and removed Supabase docs.
 - Ran `npm run build`; it failed locally because `@next/swc-darwin-arm64` is not installed (native SWC binary missing). This is a local environment issue, not a code error.
+- Removed `postcss.config.js` to avoid CommonJS vs ESM conflict with "type": "module". Kept `postcss.config.mjs`.
