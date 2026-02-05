@@ -1,53 +1,41 @@
 # Setup Instructions
 
 ## The Issue
-You're getting "Edge Function returned a non-2xx status code" because the required environment variables are missing.
+You're seeing auth/database errors because the required Firebase environment variables are missing.
 
 ## Solution
-You need to create a `.env.local` file with your Supabase credentials.
+Create a Firebase project, enable Anonymous Auth, and set the Firebase config in `.env.local`.
 
-### Step 1: Get Supabase Credentials
-1. Go to your Supabase Dashboard
-2. Navigate to Settings → API
-3. Copy your Project URL and anon/public key
+### Step 1: Create a Firebase project
+1. Go to the Firebase Console.
+2. Create a new project (or use an existing one).
+3. Add a Web app and copy the config values.
 
-### Step 2: Create .env.local file
+### Step 2: Enable Anonymous Auth
+1. Open Authentication -> Sign-in method.
+2. Enable Anonymous sign-in.
+
+### Step 3: Create Firestore
+1. Open Firestore Database.
+2. Create a database (test mode is OK for local development).
+
+### Step 4: Create `.env.local`
 Create a file named `.env.local` in the project root with:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-NEXT_PUBLIC_PARENT_ORIGINS=https://yourmain.site,https://*.yourmain.site
-NEXT_PUBLIC_EMBED_TITLE="Poker Table (For Fun)"
+NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
 ```
 
-### Step 3: Replace the placeholder values
-- Replace `https://your-project-ref.supabase.co` with your actual Supabase URL
-- Replace `your-anon-key-here` with your actual anon key
-- Update the parent origins if you plan to embed this
-
-### Step 4: Restart the development server
+### Step 5: Run the app
 ```bash
 npm run dev
 ```
 
-## Database Setup
-You also need to set up the database schema in Supabase:
-
-1. Go to Supabase Dashboard → SQL Editor
-2. Copy the contents of `supabase/sql/poker_schema.sql`
-3. Paste and run the SQL
-
-## Enable Anonymous Auth
-1. Go to Authentication → Providers in Supabase Dashboard
-2. Enable "Anonymous sign-ins"
-
-## Deploy Edge Functions
-If you have Supabase CLI installed:
-```bash
-supabase functions deploy create_table join_table start_hand player_action
-```
-
-Or deploy them manually through the Supabase Dashboard.
-
-
+## Notes
+- The app creates Firestore documents automatically. It uses collections named `tables`, `players`, and `hands`.
+- For production, tighten Firestore rules to authenticated users instead of test mode.

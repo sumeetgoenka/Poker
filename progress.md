@@ -29,3 +29,8 @@ Remaining:
 - Firebase logic improved: scoped queries, blinds posted on start, pot/current_bet updates, and actor rotation on actions.
 - Table UI revamped: responsive layout, dynamic seat spacing/sizing, true empty seats, owner/blinds display.
 - Added current-player glow, action tray polish, and render_game_to_text hook for automation.
+
+Updates:
+- Removed all Supabase routes/pages; no app/ code imports Supabase anymore.
+- Updated SETUP.md to Firebase-only config and removed Supabase docs.
+- Ran `npm run build`; it failed locally because `@next/swc-darwin-arm64` is not installed (native SWC binary missing). This is a local environment issue, not a code error.
