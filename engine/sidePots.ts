@@ -72,7 +72,7 @@ export function distributePots(
     
     // Find the best hand among eligible players
     let bestPlayers: string[] = [];
-    let bestRank = { rank: 0, kickers: [] };
+    let bestRank: { rank: number; kickers: number[] } = { rank: 0, kickers: [] };
     
     for (const playerId of pot.eligiblePlayerIds) {
       const playerRanking = handRankings.get(playerId);

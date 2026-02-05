@@ -6,7 +6,9 @@ import {
   GameEvent, 
   TableConfig,
   ChipAmount,
-  Card
+  Card,
+  BetContext,
+  PlayerActionType
 } from './types';
 import { 
   getLegalActions, 
@@ -159,8 +161,13 @@ export class Table {
     deck: Card[];
     board: Card[];
     pots: Array<{ cap?: ChipAmount; amount: ChipAmount; eligiblePlayerIds: string[] }>;
-    betCtx: typeof this.betCtx;
-    actionHistory: typeof this.actionHistory;
+    betCtx: BetContext;
+    actionHistory: Array<{
+      playerId: string;
+      type: string;
+      amount?: ChipAmount;
+      street: string;
+    }>;
     config: TableConfig;
   } {
     return {
@@ -284,8 +291,8 @@ export class Table {
     // Auto-fold if there's a bet to call, otherwise auto-check
     const legalActions = getLegalActions(player, this.betCtx, this.players);
     const action: PlayerAction = legalActions.callAmount > 0 
-      ? { type: 'FOLD' }
-      : { type: 'CHECK' };
+      ? { type: PlayerActionType.FOLD }
+      : { type: PlayerActionType.CHECK };
     
     this.act(playerId, action);
   }
