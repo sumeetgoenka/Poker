@@ -50,3 +50,4 @@ supabase functions deploy create_table join_table start_hand player_action
 
 Or deploy them manually through the Supabase Dashboard.
 
+
