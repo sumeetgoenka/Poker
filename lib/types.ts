@@ -1,6 +1,8 @@
 export interface Player {
   seat: number;
   nickname: string;
+  user_id?: string;
+  is_connected?: boolean;
   stack: number;
   bet: number;
   folded: boolean;
@@ -30,6 +32,7 @@ export interface TableConfig {
   big_blind: number;
   max_players: number;
   default_stack: number;
+  created_by?: string;
 }
 
 export interface PrivateHole {

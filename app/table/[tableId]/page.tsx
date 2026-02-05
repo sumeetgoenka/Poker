@@ -61,8 +61,9 @@ export default function TablePage() {
   // Load initial state
   const loadInitialState = useCallback(async () => {
     try {
-      const { hand: initialHand, players: initialPlayers } = await fetchGameState(tableId);
+      const { table: initialTable, hand: initialHand, players: initialPlayers } = await fetchGameState(tableId);
 
+      if (initialTable) setTable(initialTable);
       if (initialHand) setHand(initialHand);
       if (initialPlayers) setPlayers(initialPlayers);
 
@@ -80,7 +81,7 @@ export default function TablePage() {
     } catch (err: any) {
       addToast(err.message || 'Failed to load game state', 'error');
     }
-  }, [tableId, setHand, setPlayers, setMySeat, setMyHoleCards]);
+  }, [tableId, setTable, setHand, setPlayers, setMySeat, setMyHoleCards]);
 
   // Load initial state and set up polling
   useEffect(() => {
@@ -141,15 +142,23 @@ export default function TablePage() {
     }
   };
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    addToast(`${label} copied!`, 'success');
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(text);
+      addToast(`${label} copied!`, 'success');
+    } catch (err: any) {
+      addToast(err.message || 'Copy failed', 'error');
+    }
   };
 
   const isMyTurn = mySeat !== null && hand?.actor_seat === mySeat;
   const myPlayer = players.find((p) => p.seat === mySeat);
   const currentBet = Math.max(...players.map((p) => p.bet), 0);
   const callAmount = myPlayer ? currentBet - myPlayer.bet : 0;
+  const canBetOrRaise = betAmount > 0;
 
   if (!hasJoined) {
     return (
@@ -192,7 +201,7 @@ export default function TablePage() {
     seat: player.seat,
     nickname: player.nickname,
     stack: player.stack,
-    is_connected: true, // Assuming connected if they're in the game
+    is_connected: player.is_connected ?? true,
     cards: player.seat === mySeat ? myHoleCards : undefined,
     is_dealer: player.seat === hand?.dealer_seat,
     is_small_blind: player.seat === hand?.small_blind_seat,
@@ -204,6 +213,58 @@ export default function TablePage() {
 
   // Determine game state
   const gameState = hand ? 'playing' : 'waiting';
+  const ownerName = table?.created_by
+    ? players.find((p) => p.user_id === table.created_by)?.nickname
+    : undefined;
+  const blindsLabel = table ? `NLH ~ ${table.small_blind}/${table.big_blind}` : 'NLH';
+  const maxSeats = table?.max_players ?? 10;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    (window as any).render_game_to_text = () => {
+      const payload = {
+        mode: hasJoined ? (hand ? 'hand' : 'lobby') : 'join',
+        tableId,
+        table: table
+          ? {
+              id: table.id,
+              small_blind: table.small_blind,
+              big_blind: table.big_blind,
+              max_players: table.max_players,
+              owner_id: table.created_by ?? null,
+            }
+          : null,
+        hand: hand
+          ? {
+              id: hand.id,
+              pot: hand.pot,
+              street: hand.street,
+              actor_seat: hand.actor_seat,
+              act_deadline: hand.act_deadline,
+              board: hand.board,
+              action_log: hand.action_log?.slice(-5) ?? [],
+            }
+          : null,
+        players: players.map((p) => ({
+          seat: p.seat,
+          nickname: p.nickname,
+          stack: p.stack,
+          bet: p.bet,
+          folded: p.folded,
+          is_allin: p.is_allin,
+        })),
+        me: {
+          seat: mySeat,
+          hole_cards: myHoleCards,
+        },
+        coordinate_system: 'No spatial coordinates; UI-only state.',
+      };
+      return JSON.stringify(payload);
+    };
+    if (!(window as any).advanceTime) {
+      (window as any).advanceTime = () => {};
+    }
+  }, [tableId, table, hand, players, mySeat, myHoleCards, hasJoined]);
 
   return (
     <div className="relative">
@@ -215,6 +276,9 @@ export default function TablePage() {
         board={hand?.board ?? []}
         currentPlayer={hand?.actor_seat}
         gameState={gameState}
+        ownerName={ownerName}
+        blindsLabel={blindsLabel}
+        maxSeats={maxSeats}
         onSeatClick={handleSeatClick}
         onShareLink={handleShareLink}
         onJoinLiveGame={handleJoinLiveGame}
@@ -222,7 +286,7 @@ export default function TablePage() {
 
       {/* Action buttons overlay */}
       {isMyTurn && (
-        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-600 rounded-lg p-4 z-50">
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-black/70 border border-white/10 rounded-xl p-4 z-50 backdrop-blur shadow-xl">
           <div className="flex flex-wrap gap-3 items-center">
             <Button onClick={() => handleAction('fold')} variant="danger" size="sm">
               Fold
@@ -245,10 +309,10 @@ export default function TablePage() {
                 className="w-24 px-3 py-1.5 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:border-emerald-500"
                 min={0}
               />
-              <Button onClick={() => handleAction('bet')} size="sm">
+              <Button onClick={() => handleAction('bet')} size="sm" disabled={!canBetOrRaise}>
                 Bet
               </Button>
-              <Button onClick={() => handleAction('raise')} size="sm">
+              <Button onClick={() => handleAction('raise')} size="sm" disabled={!canBetOrRaise}>
                 Raise
               </Button>
             </div>

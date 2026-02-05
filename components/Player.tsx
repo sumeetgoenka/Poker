@@ -2,7 +2,8 @@
 import { Card } from './Card';
 
 interface PlayerProps {
-  player: {
+  seat: number;
+  player?: {
     seat: number;
     nickname: string;
     stack: number;
@@ -18,26 +19,37 @@ interface PlayerProps {
   };
   position: { x: number; y: number };
   isHovered: boolean;
+  size?: number;
   onClick: () => void;
+  onHoverChange?: (hovered: boolean) => void;
 }
 
-export function Player({ player, position, isHovered, onClick }: PlayerProps) {
+export function Player({ seat, player, position, isHovered, size, onClick, onHoverChange }: PlayerProps) {
   const isOccupied = !!player;
+  const seatWidth = size ?? 88;
+  const seatHeight = Math.round((size ?? 88) * 0.78);
   
   return (
     <div
-      className={`absolute w-20 h-16 border-2 border-dashed border-gray-400 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all duration-200 player-card ${
+      className={`absolute border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all duration-200 player-card ${
         isOccupied 
-          ? 'occupied' 
+          ? 'occupied border-gray-500' 
           : isHovered 
             ? 'seat-hover' 
-            : 'hover:bg-gray-700'
+            : 'hover:bg-gray-700 border-gray-500'
       }`}
+      data-current={player?.is_current_player ? 'true' : 'false'}
       style={{
-        left: `calc(50% + ${position.x}px - 40px)`,
-        top: `calc(50% + ${position.y}px - 32px)`,
+        left: `calc(50% + ${position.x}px - ${Math.round(seatWidth / 2)}px)`,
+        top: `calc(50% + ${position.y}px - ${Math.round(seatHeight / 2)}px)`,
+        width: seatWidth,
+        height: seatHeight,
+        boxShadow: player?.is_current_player ? '0 0 20px rgba(16,185,129,0.6)' : undefined,
+        borderColor: player?.is_current_player ? 'rgba(16,185,129,0.9)' : undefined,
       }}
       onClick={onClick}
+      onMouseEnter={() => onHoverChange?.(true)}
+      onMouseLeave={() => onHoverChange?.(false)}
     >
       {isOccupied ? (
         <div className="text-center text-white w-full">
@@ -59,16 +71,16 @@ export function Player({ player, position, isHovered, onClick }: PlayerProps) {
           
           {/* Player Name */}
           <div className="text-xs player-name truncate max-w-full px-1">
-            {player.nickname}
+            {player?.nickname || `Seat ${seat}`}
           </div>
           
           {/* Stack */}
           <div className="text-xs stack-amount">
-            ${player.stack.toLocaleString()}
+            ${player?.stack?.toLocaleString() ?? '0'}
           </div>
           
           {/* Current Bet */}
-          {player.current_bet && player.current_bet > 0 && (
+          {player?.current_bet && player.current_bet > 0 && (
             <div className="text-xs text-yellow-400 font-bold">
               ${player.current_bet}
             </div>
@@ -76,13 +88,13 @@ export function Player({ player, position, isHovered, onClick }: PlayerProps) {
           
           {/* Status */}
           <div className="text-xs">
-            {player.is_folded && <span className="text-red-400">FOLDED</span>}
-            {player.is_all_in && <span className="text-orange-400">ALL IN</span>}
-            {!player.is_connected && <span className="text-gray-400">OFFLINE</span>}
+            {player?.is_folded && <span className="text-red-400">FOLDED</span>}
+            {player?.is_all_in && <span className="text-orange-400">ALL IN</span>}
+            {player?.is_connected === false && <span className="text-gray-400">OFFLINE</span>}
           </div>
           
           {/* Player Cards */}
-          {player.cards && player.cards.length > 0 && (
+          {player?.cards && player.cards.length > 0 && (
             <div className="flex space-x-1 mt-1">
               {player.cards.map((card, index) => (
                 <Card key={index} card={card} size="sm" />
@@ -91,7 +103,10 @@ export function Player({ player, position, isHovered, onClick }: PlayerProps) {
           )}
         </div>
       ) : (
-        <div className="seat-number text-lg">{player.seat}</div>
+        <div className="seat-number text-sm">
+          <div>Seat {seat}</div>
+          <div className="text-[10px] text-gray-400 mt-1">Click to sit</div>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
 export interface CreateTableParams {
   smallBlind: number;
@@ -25,8 +25,49 @@ export interface PlayerActionParams {
 }
 
 export interface GameState {
+  table: any | null;
   hand: any;
   players: any[];
+}
+
+async function getPlayersForTable(tableId: string) {
+  const playersQuery = query(
+    collection(db, 'players'),
+    where('table_id', '==', tableId)
+  );
+  const playersSnap = await getDocs(playersQuery);
+  return playersSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+}
+
+async function getLatestHand(tableId: string) {
+  const handsQuery = query(
+    collection(db, 'hands'),
+    where('table_id', '==', tableId),
+    orderBy('created_at', 'desc'),
+    limit(1)
+  );
+  const handsSnap = await getDocs(handsQuery);
+  if (handsSnap.empty) return null;
+  const docSnap = handsSnap.docs[0];
+  return { id: docSnap.id, ...docSnap.data() };
+}
+
+function getNextActiveSeat(players: any[], currentSeat: number) {
+  if (players.length === 0) return null;
+  const active = players.filter(p => !p.folded && (p.stack ?? 0) > 0);
+  if (active.length === 0) return null;
+  const seats = active.map(p => p.seat).sort((a, b) => a - b);
+  const currentIndex = seats.indexOf(currentSeat);
+  if (currentIndex === -1) return seats[0];
+  return seats[(currentIndex + 1) % seats.length];
+}
+
+function getNextSeat(players: any[], startSeat: number) {
+  const seats = players.map(p => p.seat).sort((a, b) => a - b);
+  if (seats.length === 0) return null;
+  const idx = seats.indexOf(startSeat);
+  if (idx === -1) return seats[0];
+  return seats[(idx + 1) % seats.length];
 }
 
 // Create a new table
@@ -77,10 +118,7 @@ export async function joinTable(params: JoinTableParams, userId: string) {
   const tableData = tableSnap.data();
   
   // Find available seat (simple implementation)
-  const playersSnap = await getDocs(collection(db, 'players'));
-  const existingPlayers = playersSnap.docs
-    .map(doc => doc.data())
-    .filter(player => player.table_id === tableId);
+  const existingPlayers = await getPlayersForTable(tableId);
   
   const usedSeats = existingPlayers.map(p => p.seat);
   const availableSeat = Array.from({ length: tableData.max_players || 6 }, (_, i) => i + 1).find(seat => !usedSeats.includes(seat));
@@ -113,22 +151,38 @@ export async function startHand(params: StartHandParams) {
   const { table_id } = params;
   
   // Get all players at the table
-  const playersSnap = await getDocs(collection(db, 'players'));
-  const players = playersSnap.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(player => player.table_id === table_id);
+  const players = await getPlayersForTable(table_id);
   
   if (players.length < 2) {
     throw new Error('Need at least 2 players to start a hand');
   }
 
+  const tableSnap = await getDoc(doc(db, 'tables', table_id));
+  if (!tableSnap.exists()) {
+    throw new Error('Table not found');
+  }
+  const tableData = tableSnap.data();
+
+  const lastHand = await getLatestHand(table_id);
+  const lastDealerSeat = lastHand?.dealer_seat ?? players[0].seat;
+  const dealerSeat = getNextSeat(players, lastDealerSeat) ?? players[0].seat;
+  const smallBlindSeat = getNextSeat(players, dealerSeat);
+  const bigBlindSeat = smallBlindSeat ? getNextSeat(players, smallBlindSeat) : null;
+
+  const smallBlind = tableData.small_blind ?? 10;
+  const bigBlind = tableData.big_blind ?? 20;
+  
   // Create a new hand
   const handData = {
     table_id,
     pot: 0,
     board: [],
     street: 'preflop',
-    actor_seat: 1, // Simple: first player acts first
+    dealer_seat: dealerSeat,
+    small_blind_seat: smallBlindSeat,
+    big_blind_seat: bigBlindSeat,
+    current_bet: bigBlind,
+    actor_seat: bigBlindSeat ? getNextActiveSeat(players, bigBlindSeat) : null,
     act_deadline: new Date(Date.now() + 30000).toISOString(), // 30 seconds
     action_log: [],
     created_at: new Date().toISOString()
@@ -138,12 +192,32 @@ export async function startHand(params: StartHandParams) {
   
   // Reset player bets and status
   for (const player of players) {
-    await updateDoc(doc(db, 'players', player.id), {
+    const updates: any = {
       bet: 0,
       folded: false,
-      is_allin: false
-    });
+      is_allin: false,
+    };
+    if (player.seat === smallBlindSeat) {
+      const sbAmount = Math.min(player.stack ?? 0, smallBlind);
+      updates.bet = sbAmount;
+      updates.stack = Math.max(0, (player.stack ?? 0) - sbAmount);
+      if (updates.stack === 0) updates.is_allin = true;
+    }
+    if (player.seat === bigBlindSeat) {
+      const bbAmount = Math.min(player.stack ?? 0, bigBlind);
+      updates.bet = bbAmount;
+      updates.stack = Math.max(0, (player.stack ?? 0) - bbAmount);
+      if (updates.stack === 0) updates.is_allin = true;
+    }
+    await updateDoc(doc(db, 'players', player.id), updates);
   }
+
+  const initialPot = players.reduce((sum, p) => {
+    if (p.seat === smallBlindSeat) return sum + Math.min(p.stack ?? 0, smallBlind);
+    if (p.seat === bigBlindSeat) return sum + Math.min(p.stack ?? 0, bigBlind);
+    return sum;
+  }, 0);
+  await updateDoc(doc(db, 'hands', handRef.id), { pot: initialPot });
 
   return { hand_id: handRef.id };
 }
@@ -153,24 +227,15 @@ export async function playerAction(params: PlayerActionParams) {
   const { table_id, action, amount = 0 } = params;
   
   // Get current hand
-  const handsSnap = await getDocs(collection(db, 'hands'));
-  const hands = handsSnap.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(hand => hand.table_id === table_id)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  
-  if (hands.length === 0) {
+  const handDoc = await getLatestHand(table_id);
+  if (!handDoc) {
     throw new Error('No active hand found');
   }
 
-  const handDoc = { id: hands[0].id, ...hands[0] };
   const handData = handDoc;
   
   // Get current player
-  const playersSnap = await getDocs(collection(db, 'players'));
-  const players = playersSnap.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(player => player.table_id === table_id);
+  const players = await getPlayersForTable(table_id);
   
   const currentPlayer = players.find(p => p.seat === handData.actor_seat);
   if (!currentPlayer) {
@@ -179,16 +244,45 @@ export async function playerAction(params: PlayerActionParams) {
 
   // Update player based on action
   const updates: any = {};
+  const currentBet = handData.current_bet ?? Math.max(...players.map(p => p.bet ?? 0), 0);
+  let potDelta = 0;
   
   switch (action) {
     case 'fold':
       updates.folded = true;
       break;
     case 'call':
+      {
+        const toCall = Math.max(0, currentBet - (currentPlayer.bet ?? 0));
+        const commit = Math.min(currentPlayer.stack ?? 0, toCall);
+        updates.bet = (currentPlayer.bet ?? 0) + commit;
+        updates.stack = Math.max(0, (currentPlayer.stack ?? 0) - commit);
+        potDelta = commit;
+        if (updates.stack === 0) updates.is_allin = true;
+      }
+      break;
     case 'bet':
-    case 'raise':
+      if (currentBet > 0) {
+        throw new Error('Cannot bet: there is already a bet');
+      }
+      if (amount <= 0) {
+        throw new Error('Bet must be positive');
+      }
       updates.bet = amount;
-      updates.stack = currentPlayer.stack - amount;
+      updates.stack = Math.max(0, (currentPlayer.stack ?? 0) - amount);
+      potDelta = amount;
+      if (updates.stack === 0) updates.is_allin = true;
+      await updateDoc(doc(db, 'hands', handDoc.id), { current_bet: amount });
+      break;
+    case 'raise':
+      if (amount <= currentBet) {
+        throw new Error('Raise must be greater than current bet');
+      }
+      updates.bet = amount;
+      updates.stack = Math.max(0, (currentPlayer.stack ?? 0) - amount);
+      potDelta = Math.max(0, amount - (currentPlayer.bet ?? 0));
+      if (updates.stack === 0) updates.is_allin = true;
+      await updateDoc(doc(db, 'hands', handDoc.id), { current_bet: amount });
       if (updates.stack <= 0) {
         updates.is_allin = true;
       }
@@ -196,11 +290,32 @@ export async function playerAction(params: PlayerActionParams) {
     case 'check':
       // No changes needed
       break;
+    case 'allin':
+      {
+        const commit = currentPlayer.stack ?? 0;
+        updates.bet = (currentPlayer.bet ?? 0) + commit;
+        updates.stack = 0;
+        updates.is_allin = true;
+        potDelta = commit;
+        if (updates.bet > currentBet) {
+          await updateDoc(doc(db, 'hands', handDoc.id), { current_bet: updates.bet });
+        }
+      }
+      break;
   }
 
   if (Object.keys(updates).length > 0) {
     await updateDoc(doc(db, 'players', currentPlayer.id), updates);
   }
+
+  if (potDelta > 0) {
+    await updateDoc(doc(db, 'hands', handDoc.id), {
+      pot: (handData.pot ?? 0) + potDelta
+    });
+  }
+
+  const updatedPlayers = await getPlayersForTable(table_id);
+  const nextSeat = getNextActiveSeat(updatedPlayers, currentPlayer.seat);
 
   // Add to action log
   const actionLog = [...(handData.action_log || []), {
@@ -211,7 +326,9 @@ export async function playerAction(params: PlayerActionParams) {
   }];
 
   await updateDoc(doc(db, 'hands', handDoc.id), {
-    action_log: actionLog
+    action_log: actionLog,
+    actor_seat: nextSeat,
+    act_deadline: new Date(Date.now() + 30000).toISOString()
   });
 
   return { success: true };
@@ -219,21 +336,16 @@ export async function playerAction(params: PlayerActionParams) {
 
 // Fetch current game state
 export async function fetchGameState(table_id: string): Promise<GameState> {
+  const tableSnap = await getDoc(doc(db, 'tables', table_id));
+  const table = tableSnap.exists() ? { id: tableSnap.id, ...tableSnap.data() } : null;
+
   // Get current hand
-  const handsSnap = await getDocs(collection(db, 'hands'));
-  const hands = handsSnap.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(hand => hand.table_id === table_id)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  const hand = hands.length > 0 ? hands[0] : null;
+  const hand = await getLatestHand(table_id);
 
   // Get all players
-  const playersSnap = await getDocs(collection(db, 'players'));
-  const players = playersSnap.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(player => player.table_id === table_id);
+  const players = await getPlayersForTable(table_id);
 
-  return { hand, players };
+  return { table, hand, players };
 }
 
 // Fetch player's hole cards (simplified - in real poker this would be private)
