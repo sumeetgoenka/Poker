@@ -105,7 +105,12 @@ export default function TablePage() {
 
     setIsJoining(true);
     try {
-      const result = await joinTable({ table_id: tableId, nickname: nickname.trim() });
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
+        addToast('Please sign in to join the table', 'error');
+        return;
+      }
+      const result = await joinTable({ tableId: tableId, nickname: nickname.trim() }, userId);
       setMySeat(result.seat);
       setHasJoined(true);
       addToast('Joined table successfully!', 'success');
@@ -160,65 +165,6 @@ export default function TablePage() {
   const callAmount = myPlayer ? currentBet - myPlayer.bet : 0;
   const canBetOrRaise = betAmount > 0;
 
-  if (!hasJoined) {
-    return (
-      <div className="min-h-screen felt-gradient flex items-center justify-center p-4">
-        <ToastContainer toasts={toasts} onDismiss={removeToast} />
-        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md w-full">
-          <h2 className="text-2xl font-bold mb-4">Join Table</h2>
-          <input
-            type="text"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            placeholder="Enter your nickname"
-            className="w-full px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-emerald-500 mb-4"
-            maxLength={20}
-          />
-          <Button onClick={handleJoinTable} disabled={isJoining} className="w-full" size="lg">
-            {isJoining ? 'Joining...' : 'Join Table'}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const handleSeatClick = (seat: number) => {
-    console.log(`Clicked seat ${seat}`);
-    // TODO: Implement seat joining logic
-  };
-
-  const handleShareLink = () => {
-    copyToClipboard(inviteLink, 'Invite link');
-  };
-
-  const handleJoinLiveGame = () => {
-    console.log('Join live game clicked');
-    // TODO: Implement join live game logic
-  };
-
-  // Convert players to the format expected by PokerTable
-  const pokerTablePlayers = players.map(player => ({
-    seat: player.seat,
-    nickname: player.nickname,
-    stack: player.stack,
-    is_connected: player.is_connected ?? true,
-    cards: player.seat === mySeat ? myHoleCards : undefined,
-    is_dealer: player.seat === hand?.dealer_seat,
-    is_small_blind: player.seat === hand?.small_blind_seat,
-    is_big_blind: player.seat === hand?.big_blind_seat,
-    current_bet: player.bet,
-    is_all_in: player.is_allin,
-    is_folded: player.folded,
-  }));
-
-  // Determine game state
-  const gameState = hand ? 'playing' : 'waiting';
-  const ownerName = table?.created_by
-    ? players.find((p) => p.user_id === table.created_by)?.nickname
-    : undefined;
-  const blindsLabel = table ? `NLH ~ ${table.small_blind}/${table.big_blind}` : 'NLH';
-  const maxSeats = table?.max_players ?? 10;
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     (window as any).render_game_to_text = () => {
@@ -266,6 +212,63 @@ export default function TablePage() {
     }
   }, [tableId, table, hand, players, mySeat, myHoleCards, hasJoined]);
 
+  if (!hasJoined) {
+    return (
+      <div className="min-h-screen felt-gradient flex items-center justify-center p-4">
+        <ToastContainer toasts={toasts} onDismiss={removeToast} />
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md w-full">
+          <h2 className="text-2xl font-bold mb-4">Join Table</h2>
+          <input
+            type="text"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            placeholder="Enter your nickname"
+            className="w-full px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-emerald-500 mb-4"
+            maxLength={20}
+          />
+          <Button onClick={handleJoinTable} disabled={isJoining} className="w-full" size="lg">
+            {isJoining ? 'Joining...' : 'Join Table'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSeatClick = (seat: number) => {
+    console.log(`Clicked seat ${seat}`);
+    // TODO: Implement seat joining logic
+  };
+
+  const handleShareLink = () => {
+    copyToClipboard(inviteLink, 'Invite link');
+  };
+
+  const handleJoinLiveGame = () => {
+    console.log('Join live game clicked');
+    // TODO: Implement join live game logic
+  };
+
+  // Convert players to the format expected by PokerTable
+  const pokerTablePlayers = players.map(player => ({
+    seat: player.seat,
+    nickname: player.nickname,
+    stack: player.stack,
+    is_connected: player.is_connected ?? true,
+    cards: player.seat === mySeat ? (myHoleCards ?? undefined) : undefined,
+    is_dealer: player.seat === hand?.dealer_seat,
+    current_bet: player.bet,
+    is_all_in: player.is_allin,
+    is_folded: player.folded,
+  }));
+
+  // Determine game state
+  const gameState = hand ? 'playing' : 'waiting';
+  const ownerName = table?.created_by
+    ? players.find((p) => p.user_id === table.created_by)?.nickname
+    : undefined;
+  const blindsLabel = table ? `NLH ~ ${table.small_blind}/${table.big_blind}` : 'NLH';
+  const maxSeats = table?.max_players ?? 10;
+
   return (
     <div className="relative">
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
@@ -274,7 +277,7 @@ export default function TablePage() {
         players={pokerTablePlayers}
         pot={hand?.pot ?? 0}
         board={hand?.board ?? []}
-        currentPlayer={hand?.actor_seat}
+        currentPlayer={hand?.actor_seat ?? undefined}
         gameState={gameState}
         ownerName={ownerName}
         blindsLabel={blindsLabel}

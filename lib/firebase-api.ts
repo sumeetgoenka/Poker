@@ -1,5 +1,6 @@
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { Player, HandState } from '@/lib/types';
 
 export interface CreateTableParams {
   smallBlind: number;
@@ -30,16 +31,16 @@ export interface GameState {
   players: any[];
 }
 
-async function getPlayersForTable(tableId: string) {
+async function getPlayersForTable(tableId: string): Promise<Array<Player & { id: string }>> {
   const playersQuery = query(
     collection(db, 'players'),
     where('table_id', '==', tableId)
   );
   const playersSnap = await getDocs(playersQuery);
-  return playersSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+  return playersSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Player & { id: string }));
 }
 
-async function getLatestHand(tableId: string) {
+async function getLatestHand(tableId: string): Promise<HandState | null> {
   const handsQuery = query(
     collection(db, 'hands'),
     where('table_id', '==', tableId),
@@ -49,7 +50,7 @@ async function getLatestHand(tableId: string) {
   const handsSnap = await getDocs(handsQuery);
   if (handsSnap.empty) return null;
   const docSnap = handsSnap.docs[0];
-  return { id: docSnap.id, ...docSnap.data() };
+  return { id: docSnap.id, ...docSnap.data() } as HandState;
 }
 
 function getNextActiveSeat(players: any[], currentSeat: number) {
@@ -244,7 +245,7 @@ export async function playerAction(params: PlayerActionParams) {
 
   // Update player based on action
   const updates: any = {};
-  const currentBet = handData.current_bet ?? Math.max(...players.map(p => p.bet ?? 0), 0);
+  const currentBet = Math.max(...players.map(p => p.bet ?? 0), 0);
   let potDelta = 0;
   
   switch (action) {

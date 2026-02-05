@@ -152,7 +152,7 @@ export function PokerTable({
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white">
                   <div className="text-center">
                     <div className="text-2xl mb-4">⏰ Waiting for others</div>
-                    <div className="text-lg mb-6">No Limit Texas Hold'em</div>
+                    <div className="text-lg mb-6">No Limit Texas Hold&apos;em</div>
                     <div className="space-y-4">
                       <div>
                         <div className="mb-2">Share this link with your friends!</div>
@@ -253,7 +253,7 @@ export function PokerTable({
           <div className="flex items-center space-x-2">
             <div className="bg-white/10 rounded-lg px-4 py-2 flex items-center space-x-2">
               <span className="text-gray-400 text-sm">
-                It's a bit quiet here. Click on the balloon and send a Message!
+                It&apos;s a bit quiet here. Click on the balloon and send a Message!
               </span>
               <button className="p-1 hover:bg-gray-600 rounded">💬</button>
               <button className="p-1 hover:bg-gray-600 rounded">🎤</button>
