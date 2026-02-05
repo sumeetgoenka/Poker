@@ -40,23 +40,31 @@ export const useGameStore = create<GameStore>((set) => ({
     set((state) => {
       const newState = { ...state };
 
-      if (diff.hand) {
-        newState.hand = { ...state.hand, ...diff.hand } as HandState;
+      if (diff.hand !== undefined) {
+        if (diff.hand === null) {
+          newState.hand = null;
+        } else {
+          newState.hand = { ...(state.hand ?? {}), ...diff.hand } as HandState;
+        }
       }
 
-      if (diff.players) {
+      if (diff.players !== undefined) {
         newState.players = diff.players;
+      }
+
+      if (diff.table !== undefined) {
+        newState.table = diff.table;
       }
 
       if (diff.pot !== undefined && newState.hand) {
         newState.hand.pot = diff.pot;
       }
 
-      if (diff.board && newState.hand) {
+      if (diff.board !== undefined && newState.hand) {
         newState.hand.board = diff.board;
       }
 
-      if (diff.action_log && newState.hand) {
+      if (diff.action_log !== undefined && newState.hand) {
         newState.hand.action_log = diff.action_log;
       }
 

@@ -55,8 +55,9 @@ function EmbedContent() {
     if (!tableId) return;
 
     try {
-      const { hand: initialHand, players: initialPlayers } = await fetchGameState(tableId);
+      const { table: initialTable, hand: initialHand, players: initialPlayers } = await fetchGameState(tableId);
 
+      if (initialTable) setTable(initialTable);
       if (initialHand) setHand(initialHand);
       if (initialPlayers) setPlayers(initialPlayers);
 
@@ -72,7 +73,7 @@ function EmbedContent() {
     } catch (err: any) {
       addToast(err.message || 'Failed to load game state', 'error');
     }
-  }, [tableId, setHand, setPlayers, setMySeat, setMyHoleCards]);
+  }, [tableId, setTable, setHand, setPlayers, setMySeat, setMyHoleCards]);
 
   useEffect(() => {
     if (!tableId) return;
@@ -146,6 +147,53 @@ function EmbedContent() {
   const myPlayer = players.find((p) => p.seat === mySeat);
   const currentBet = Math.max(...players.map((p) => p.bet), 0);
   const callAmount = myPlayer ? currentBet - myPlayer.bet : 0;
+  const canBetOrRaise = betAmount > 0;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    (window as any).render_game_to_text = () => {
+      const payload = {
+        mode: hasJoined ? (hand ? 'hand' : 'lobby') : 'join',
+        tableId,
+        table: table
+          ? {
+              id: table.id,
+              small_blind: table.small_blind,
+              big_blind: table.big_blind,
+              max_players: table.max_players,
+            }
+          : null,
+        hand: hand
+          ? {
+              id: hand.id,
+              pot: hand.pot,
+              street: hand.street,
+              actor_seat: hand.actor_seat,
+              act_deadline: hand.act_deadline,
+              board: hand.board,
+              action_log: hand.action_log?.slice(-5) ?? [],
+            }
+          : null,
+        players: players.map((p) => ({
+          seat: p.seat,
+          nickname: p.nickname,
+          stack: p.stack,
+          bet: p.bet,
+          folded: p.folded,
+          is_allin: p.is_allin,
+        })),
+        me: {
+          seat: mySeat,
+          hole_cards: myHoleCards,
+        },
+        coordinate_system: 'No spatial coordinates; UI-only state.',
+      };
+      return JSON.stringify(payload);
+    };
+    if (!(window as any).advanceTime) {
+      (window as any).advanceTime = () => {};
+    }
+  }, [tableId, table, hand, players, mySeat, myHoleCards, hasJoined]);
 
   if (!tableId) {
     return (
@@ -285,10 +333,10 @@ function EmbedContent() {
               className="w-20 px-2 py-1 bg-white/20 border border-white/30 rounded text-white text-sm focus:outline-none focus:border-emerald-500"
               min={0}
             />
-            <Button onClick={() => handleAction('bet')} size="sm">
+            <Button onClick={() => handleAction('bet')} size="sm" disabled={!canBetOrRaise}>
               Bet
             </Button>
-            <Button onClick={() => handleAction('raise')} size="sm">
+            <Button onClick={() => handleAction('raise')} size="sm" disabled={!canBetOrRaise}>
               Raise
             </Button>
             <Button onClick={() => handleAction('allin')} variant="danger" size="sm">

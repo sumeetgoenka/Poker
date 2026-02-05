@@ -6,7 +6,7 @@ const sb = createBrowserSupabase();
 export function ActionBar({ tableId, onAfterSuccess, isHost, hasHand }: { tableId: string; onAfterSuccess: () => void; isHost?: boolean; hasHand?: boolean }) {
   async function startHand() {
     await sb.auth.signInAnonymously();
-    const { error } = await sb.functions.invoke("start_hand", { body: { tableId } });
+    const { error } = await sb.functions.invoke("start_hand", { body: { table_id: tableId } });
     if (error) { alert(error.message); return; }
     onAfterSuccess();
   }
@@ -14,7 +14,7 @@ export function ActionBar({ tableId, onAfterSuccess, isHost, hasHand }: { tableI
   async function act(type: "fold" | "check" | "call" | "bet" | "raise", amount?: number) {
     await sb.auth.signInAnonymously();
     if (!hasHand) { await startHand(); }
-    const { error } = await sb.functions.invoke("player_action", { body: { tableId, type, amount } });
+    const { error } = await sb.functions.invoke("player_action", { body: { table_id: tableId, action: type, amount } });
     if (error) { alert(error.message); return; }
     onAfterSuccess(); // broadcast tick so everyone refetches
   }
@@ -29,5 +29,4 @@ export function ActionBar({ tableId, onAfterSuccess, isHost, hasHand }: { tableI
     </div>
   );
 }
-
 

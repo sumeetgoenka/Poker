@@ -25,7 +25,7 @@ export function useBroadcastRefetch(tableId: string) {
 
   const refetch = useCallback(async () => {
     const [handRes, playersRes, actionsRes] = await Promise.all([
-      sb.from("hand").select("*").eq("table_id", tableId).maybeSingle(),
+      sb.from("hand").select("*").eq("table_id", tableId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("table_players").select("seat,nickname,stack,is_connected").eq("table_id", tableId).order("seat"),
       sb.from("actions").select("seat,action,amount,created_at").eq("table_id", tableId).order("created_at", { ascending: false }).limit(20),
     ]);
@@ -61,5 +61,4 @@ export function useBroadcastRefetch(tableId: string) {
 
   return { state, refetch, tick };
 }
-
 

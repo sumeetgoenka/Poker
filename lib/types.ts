@@ -1,6 +1,8 @@
 export interface Player {
   seat: number;
   nickname: string;
+  user_id?: string;
+  is_connected?: boolean;
   stack: number;
   bet: number;
   folded: boolean;

@@ -61,7 +61,7 @@ export async function playerAction(params: PlayerActionParams) {
 
 // Fetch initial game state
 export async function fetchGameState(tableId: string) {
-  const [handResult, playersResult] = await Promise.all([
+  const [handResult, playersResult, tableResult] = await Promise.all([
     supabase
       .from('hand')
       .select('*')
@@ -70,9 +70,15 @@ export async function fetchGameState(tableId: string) {
       .limit(1)
       .maybeSingle(),
     supabase.from('players').select('*').eq('table_id', tableId),
+    supabase
+      .from('tables')
+      .select('id, small_blind, big_blind, max_players, default_stack')
+      .eq('id', tableId)
+      .maybeSingle(),
   ]);
 
   return {
+    table: tableResult.data ?? null,
     hand: handResult.data,
     players: playersResult.data || [],
   };
